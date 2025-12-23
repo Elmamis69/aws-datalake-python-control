@@ -2,8 +2,10 @@
 run_worker.py
 Script de entrada para lanzar el worker de SQS y procesar archivos S3.
 """
+
 import os
 import yaml
+import logging
 from datalake.aws_session import get_boto3_session
 from datalake.sqs_worker import run_sqs_worker
 
@@ -14,6 +16,24 @@ def load_config(path):
         return yaml.safe_load(f)
 
 def main():
+
+    # Configurar logging
+
+    # Crear carpeta de logs si no existe
+    os.makedirs("logs", exist_ok=True)
+
+    # Configurar logging para consola y archivo
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(name)s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("logs/worker.log", encoding="utf-8")
+        ]
+    )
+    logger = logging.getLogger("run_worker")
+
     config = load_config(CONFIG_PATH)
     aws_conf = config['aws']
     worker_conf = config['worker']
@@ -51,7 +71,7 @@ def main():
             bucket = s3_raw_bucket
             key = body.strip()
 
-        print(f"Procesando archivo S3: s3://{bucket}/{key}")
+        logger.info(f"Procesando archivo S3: s3://{bucket}/{key}")
         try:
             df = read_jsonl_from_s3(bucket, key, session)
             result = transform_jsonl_to_parquet(
@@ -65,10 +85,10 @@ def main():
             filename = key.split('/')[-1].replace('.jsonl', '.parquet')
             out_key = f"{s3_processed_prefix}{partition_path}{filename}"
             write_parquet_to_s3(out_df, s3_processed_bucket, out_key, session)
-            print(f"Archivo procesado y guardado en s3://{s3_processed_bucket}/{out_key}")
+            logger.info(f"Archivo procesado y guardado en s3://{s3_processed_bucket}/{out_key}")
             return True
         except Exception as e:
-            print(f"Error procesando archivo: {e}")
+            logger.error(f"Error procesando archivo: {e}")
             return False
 
     run_sqs_worker(
