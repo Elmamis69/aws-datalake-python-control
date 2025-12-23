@@ -1,0 +1,21 @@
+# settings.yaml
+# Configuración real para aws-datalake-python-control
+
+aws:
+  profile: default           # Cambia por el nombre de tu perfil AWS CLI si usas uno distinto
+  region: us-east-2          # Cambia por tu región AWS
+  s3_raw_bucket: aws-datalake-demo-raw-992382594961
+  s3_raw_prefix: raw/events/incoming/
+  s3_processed_bucket: aws-datalake-demo-raw-992382594961
+  s3_processed_prefix: processed/events/
+  sqs_queue_url: https://sqs.us-east-2.amazonaws.com/992382594961/aws-datalake-demo-queue
+
+worker:
+  poll_interval: 10
+  max_retries: 3
+  delete_on_failure: false
+
+processing:
+  partition_by_date: true
+  date_field: event_time
+  output_format: parquet
