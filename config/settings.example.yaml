@@ -1,0 +1,23 @@
+# Ejemplo de configuración para aws-datalake-python-control
+# Copia este archivo como settings.yaml y personaliza los valores locales
+
+aws:
+  profile: default           # Nombre del perfil AWS CLI o vacío para usar variables de entorno
+  region: us-east-1          # Región AWS
+  s3_raw_bucket: my-raw-bucket
+  s3_raw_prefix: raw/events/incoming/
+  s3_processed_bucket: my-processed-bucket
+  s3_processed_prefix: processed/events/
+  sqs_queue_url: https://sqs.us-east-1.amazonaws.com/123456789012/my-queue
+
+worker:
+  poll_interval: 10          # Segundos entre polls a SQS
+  max_retries: 3             # Reintentos por mensaje fallido
+  delete_on_failure: false   # Si se elimina el mensaje tras fallo (mejor dejar en false)
+
+processing:
+  partition_by_date: true    # Particionar por fecha
+  date_field: event_time     # Campo de fecha en el JSONL
+  output_format: parquet     # Formato de salida
+
+# Agrega aquí más parámetros según crezca el proyecto
