@@ -1,0 +1,3 @@
+# Ignorar archivos de configuración sensibles y entorno virtual
+config/settings.yaml
+.venv/
