@@ -20,4 +20,7 @@ processing:
   date_field: event_time     # Campo de fecha en el JSONL
   output_format: parquet     # Formato de salida
 
+glue:
+  crawler_name: datalake-processed-crawler  # Cambia por el nombre real de tu crawler en AWS Glue
+
 # Agrega aquí más parámetros según crezca el proyecto

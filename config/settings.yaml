@@ -19,3 +19,8 @@ processing:
   partition_by_date: true
   date_field: event_time
   output_format: parquet
+
+glue:
+  crawler_name: datalake-processed-crawler  # Cambia por el nombre real de tu crawler en AWS Glue
+  database_name: datalake_processed_db      # Nombre de la base de datos Glue
+  role_arn: arn:aws:iam::992382594961:role/service-role/AWSGlueServiceRole-datalake-demo  # Rol Glue con permisos a S3
