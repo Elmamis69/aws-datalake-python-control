@@ -84,7 +84,31 @@ print(df)
 
 ---
 
-## 7. Tips y troubleshooting
+## 7. Consultar datos con Athena desde Python
+
+Puedes lanzar consultas SQL sobre tus datos procesados en S3 usando Athena y obtener los resultados directamente en Python.
+
+Ejecuta el script de ejemplo:
+
+```powershell
+$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/athena_query_example.py"
+```
+
+El script lanza una consulta como:
+
+```sql
+SELECT * FROM datalake_processed_db.year_2026 LIMIT 10;
+```
+
+Y muestra los resultados en la terminal. Puedes modificar la consulta y la tabla según tus necesidades.
+
+Recuerda que Athena necesita un bucket de resultados (output_location) con permisos de escritura.
+
+---
+
+---
+
+## 8. Tips y troubleshooting
 - Si el worker no procesa mensajes, revisa credenciales, permisos y formato del mensaje SQS.
 - Puedes monitorear logs en `logs/worker.log`.
 - Si necesitas limpiar la cola SQS, hazlo desde la consola AWS o con boto3.
@@ -92,7 +116,7 @@ print(df)
 
 ---
 
-## 8. Extensión y mejoras sugeridas
+## 9. Extensión y mejoras sugeridas
 - Validación de esquema de datos
 - Manejo de errores avanzado y DLQ
 - Métricas y monitoreo

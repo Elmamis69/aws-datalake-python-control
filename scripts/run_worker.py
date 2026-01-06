@@ -44,6 +44,8 @@ def main():
     from datalake.s3_io import read_jsonl_from_s3, write_parquet_to_s3
     from datalake.transform import transform_jsonl_to_parquet
     import json
+    glue_conf = config.get('glue', {})
+    import boto3
 
     s3_raw_bucket = aws_conf['s3_raw_bucket']
     s3_raw_prefix = aws_conf['s3_raw_prefix']
@@ -86,6 +88,18 @@ def main():
             out_key = f"{s3_processed_prefix}{partition_path}{filename}"
             write_parquet_to_s3(out_df, s3_processed_bucket, out_key, session)
             logger.info(f"Archivo procesado y guardado en s3://{s3_processed_bucket}/{out_key}")
+
+            # Lanzar Glue Crawler automáticamente
+            glue_client = boto3.client('glue', region_name=aws_conf.get('region', 'us-east-2'))
+            crawler_name = glue_conf.get('crawler_name', 'datalake-processed-crawler')
+            try:
+                glue_client.start_crawler(Name=crawler_name)
+                logger.info(f"Glue Crawler '{crawler_name}' lanzado automáticamente.")
+            except glue_client.exceptions.CrawlerRunningException:
+                logger.info(f"Glue Crawler '{crawler_name}' ya está en ejecución.")
+            except Exception as e:
+                logger.error(f"Error al lanzar Glue Crawler: {e}")
+
             return True
         except Exception as e:
             logger.error(f"Error procesando archivo: {e}")
