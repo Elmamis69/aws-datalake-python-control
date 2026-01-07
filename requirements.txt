@@ -2,3 +2,5 @@ boto3
 pandas
 pyarrow
 yaml
+streamlit
+plotly
