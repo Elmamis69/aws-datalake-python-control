@@ -15,7 +15,8 @@ def run_sqs_worker(
     session: Optional[boto3.Session] = None,
     handle_message: Optional[Callable[[dict], bool]] = None,
     poll_interval: int = 10,
-    max_retries: int = 3
+    max_retries: int = 3,
+    max_empty_polls: int = None
 ):
     """
     Worker principal para consumir mensajes de SQS y procesar eventos.
@@ -25,9 +26,13 @@ def run_sqs_worker(
         handle_message (callable, optional): Función que procesa el mensaje. Debe retornar True si fue exitoso.
         poll_interval (int): Segundos entre polls.
         max_retries (int): Reintentos por mensaje fallido.
+        max_empty_polls (int): Número máximo de polls vacíos antes de terminar. None = infinito.
     """
     sqs = (session or boto3).client('sqs')
     logger.info(f"Iniciando worker SQS en {queue_url}")
+    
+    empty_polls = 0
+    
     while True:
         resp = sqs.receive_message(
             QueueUrl=queue_url,
@@ -35,9 +40,21 @@ def run_sqs_worker(
             WaitTimeSeconds=20
         )
         messages = resp.get('Messages', [])
+        
         if not messages:
+            empty_polls += 1
+            logger.info(f"No hay mensajes ({empty_polls}/{max_empty_polls or '∞'})")
+            
+            if max_empty_polls and empty_polls >= max_empty_polls:
+                logger.info("Máximo de polls vacíos alcanzado. Terminando worker.")
+                break
+                
             time.sleep(poll_interval)
             continue
+        
+        # Resetear contador si hay mensajes
+        empty_polls = 0
+        
         for msg in messages:
             receipt = msg['ReceiptHandle']
             body = msg['Body']
