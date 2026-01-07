@@ -1,6 +1,9 @@
 boto3
 pandas
 pyarrow
-yaml
+pyyaml
 streamlit
 plotly
+fastapi
+uvicorn[standard]
+requests

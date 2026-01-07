@@ -26,9 +26,27 @@ pip install -r requirements.txt
 
 ---
 
-## 2. Configuración
+## 2. Configuración y Verificación
+
+### Configurar el sistema
 - Edita `config/settings.yaml` con los nombres de tus buckets, prefijos y cola SQS.
 - Asegúrate de tener el perfil de AWS correcto configurado.
+
+### ✅ Verificar que todo funciona (¡NUEVO!)
+
+Antes de usar el sistema, ejecuta el script de diagnóstico:
+
+```bash
+python test_app.py
+```
+
+Este script verifica:
+- ✅ Configuración cargada correctamente
+- ✅ Conexión AWS exitosa
+- ✅ Glue Catalog funcionando
+- ✅ Operaciones S3 funcionando
+
+Si todas las pruebas pasan, el sistema está listo para usar.
 
 ---
 
@@ -68,40 +86,54 @@ El monitor te muestra:
 
 ---
 
-## 3. Ejecutar el worker (procesador principal)
+## 3. Comandos principales (¡NUEVO!)
 
-Desde la raíz del proyecto:
+Usa `main.py` para ejecutar diferentes operaciones:
 
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/run_worker.py"
+### Worker automático (procesamiento continuo)
+```bash
+python main.py worker
 ```
+Se queda corriendo, procesando mensajes de SQS automáticamente.
 
-El worker quedará escuchando la cola SQS y procesará archivos automáticamente.
+### Actualizar catálogo de Glue
+```bash
+python main.py catalog
+```
+Actualiza las tablas de Glue una sola vez.
 
-💡 **Tip**: Mantén el worker corriendo en una terminal mientras usas el dashboard en otra.
+### Sincronizar con S3
+```bash
+python main.py s3-sync --bucket tu-bucket-name
+python main.py s3-sync --bucket tu-bucket --prefix processed/
+```
+Lista archivos en S3 con filtros opcionales.
 
 ---
 
-## 4. 🏃 Inicio Rápido - Todo en uno
+## 4. 🏃 Inicio Rápido - Flujo completo
 
-Para probar todo el sistema de una vez:
-
-1. **Terminal 1** - Worker:
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/run_worker.py"
+### Paso 1: Verificar sistema
+```bash
+python test_app.py
 ```
 
-2. **Terminal 2** - Dashboard:
+### Paso 2: Ejecutar worker
+```bash
+python main.py worker
+```
+
+### Paso 3: Dashboard (terminal separada)
 ```bash
 streamlit run dashboard/app.py
 ```
 
-3. **Terminal 3** - Test:
+### Paso 4: Probar pipeline (terminal separada)
 ```powershell
 $env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/test_pipeline.py"
 ```
 
-¡Verás los archivos procesándose en tiempo real en el dashboard! 🚀
+¡Verás los archivos procesándose en tiempo real! 🚀
 
 ---
 
@@ -179,14 +211,26 @@ Recuerda que Athena necesita un bucket de resultados (output_location) con permi
 
 ## 9. 🛠️ Herramientas de Debugging
 
+### Verificar sistema completo
+```bash
+python test_app.py
+```
+
 ### Monitor puntual
 ```powershell
 $env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/run_monitor.py"
 ```
 
-### Verificar configuración
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/test_config.py"
+### Comandos principales
+```bash
+# Worker automático
+python main.py worker
+
+# Actualizar catálogo
+python main.py catalog
+
+# Ver archivos S3
+python main.py s3-sync --bucket tu-bucket
 ```
 
 ### Limpiar cola SQS (si es necesario)
