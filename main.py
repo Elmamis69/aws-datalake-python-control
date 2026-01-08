@@ -7,6 +7,8 @@ import logging
 import argparse
 import sys
 import yaml
+import os
+import subprocess
 from pathlib import Path
 
 # Agregar src al path
@@ -65,6 +67,44 @@ def run_catalog_update():
     tables = catalog.list_tables()
     logger.info(f"Tablas registradas: {tables}")
 
+def run_dashboard():
+    """Ejecutar dashboard de Streamlit"""
+    logger.info("Iniciando dashboard de Streamlit...")
+    
+    # Ejecutar streamlit con el PYTHONPATH correcto
+    env = os.environ.copy()
+    env['PYTHONPATH'] = 'src'
+    
+    result = subprocess.run(
+        [sys.executable, '-m', 'streamlit', 'run', 'dashboard/app.py'],
+        env=env,
+        cwd=Path(__file__).parent
+    )
+    
+    if result.returncode != 0:
+        logger.error("Error ejecutando dashboard")
+        sys.exit(1)
+
+def run_test_pipeline():
+    """Ejecutar pipeline de prueba"""
+    logger.info("Ejecutando pipeline de prueba...")
+    
+    # Ejecutar test_pipeline.py con el PYTHONPATH correcto
+    env = os.environ.copy()
+    env['PYTHONPATH'] = 'src'
+    
+    result = subprocess.run(
+        [sys.executable, 'scripts/test_pipeline.py'],
+        env=env,
+        cwd=Path(__file__).parent
+    )
+    
+    if result.returncode == 0:
+        logger.info("Pipeline de prueba ejecutado exitosamente")
+    else:
+        logger.error("Error en pipeline de prueba")
+        sys.exit(1)
+
 def run_s3_sync(bucket: str, prefix: str = ""):
     """Sincronizar archivos con S3"""
     logger.info(f"Sincronizando con S3: {bucket}/{prefix}")
@@ -81,7 +121,7 @@ def run_s3_sync(bucket: str, prefix: str = ""):
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='AWS Data Lake Control')
-    parser.add_argument('command', choices=['worker', 'catalog', 's3-sync'], 
+    parser.add_argument('command', choices=['worker', 'catalog', 's3-sync', 'pipeline', 'dashboard'], 
                        help='Comando a ejecutar')
     parser.add_argument('--bucket', help='Bucket S3 para sincronización')
     parser.add_argument('--prefix', default='', help='Prefijo S3')
@@ -98,6 +138,10 @@ def main():
                 logger.error("--bucket es requerido para s3-sync")
                 sys.exit(1)
             run_s3_sync(args.bucket, args.prefix)
+        elif args.command == 'pipeline':
+            run_test_pipeline()
+        elif args.command == 'dashboard':
+            run_dashboard()
             
     except KeyboardInterrupt:
         logger.info("Proceso interrumpido por el usuario")

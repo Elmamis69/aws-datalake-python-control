@@ -50,12 +50,12 @@ Si todas las pruebas pasan, el sistema está listo para usar.
 
 ---
 
-## 📊 Dashboard Web (¡NUEVO!)
+## 📊 Dashboard Web
 
 Lanza el dashboard interactivo para monitorear tu data lake en tiempo real:
 
 ```bash
-streamlit run dashboard/app.py
+python main.py dashboard
 ```
 
 El dashboard incluye:
@@ -86,15 +86,27 @@ El monitor te muestra:
 
 ---
 
-## 3. Comandos principales (¡NUEVO!)
+## 3. Comandos principales
 
-Usa `main.py` para ejecutar diferentes operaciones:
+Usa `main.py` para ejecutar todas las operaciones:
 
 ### Worker automático (procesamiento continuo)
 ```bash
 python main.py worker
 ```
 Se queda corriendo, procesando mensajes de SQS automáticamente.
+
+### Dashboard web interactivo
+```bash
+python main.py dashboard
+```
+Abre el dashboard en http://localhost:8501
+
+### Probar pipeline end-to-end
+```bash
+python main.py pipeline
+```
+Sube archivo de prueba y activa el flujo completo.
 
 ### Actualizar catálogo de Glue
 ```bash
@@ -118,19 +130,19 @@ Lista archivos en S3 con filtros opcionales.
 python test_app.py
 ```
 
-### Paso 2: Ejecutar worker
+### Paso 2: Ejecutar worker (Terminal 1)
 ```bash
 python main.py worker
 ```
 
-### Paso 3: Dashboard (terminal separada)
+### Paso 3: Dashboard (Terminal 2)
 ```bash
-streamlit run dashboard/app.py
+python main.py dashboard
 ```
 
-### Paso 4: Probar pipeline (terminal separada)
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/test_pipeline.py"
+### Paso 4: Probar pipeline (Terminal 3)
+```bash
+python main.py pipeline
 ```
 
 ¡Verás los archivos procesándose en tiempo real! 🚀
@@ -141,8 +153,8 @@ $env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/test_pipeline.py"
 
 Genera y sube un archivo de prueba, y envía el mensaje a SQS:
 
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/test_pipeline.py"
+```bash
+python main.py pipeline
 ```
 
 Esto simula la llegada de un archivo nuevo y activa el flujo completo.
@@ -216,21 +228,27 @@ Recuerda que Athena necesita un bucket de resultados (output_location) con permi
 python test_app.py
 ```
 
-### Monitor puntual
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/run_monitor.py"
-```
-
 ### Comandos principales
 ```bash
 # Worker automático
 python main.py worker
+
+# Dashboard web
+python main.py dashboard
+
+# Probar pipeline
+python main.py pipeline
 
 # Actualizar catálogo
 python main.py catalog
 
 # Ver archivos S3
 python main.py s3-sync --bucket tu-bucket
+```
+
+### Monitor puntual (método anterior)
+```powershell
+$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/run_monitor.py"
 ```
 
 ### Limpiar cola SQS (si es necesario)
@@ -271,7 +289,9 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 **¡Con esta guía puedes operar, monitorear y probar todo el pipeline sin depender de la consola web de AWS!** 🎉
 
 ### 📱 Accesos rápidos
-- **Dashboard**: http://localhost:8501
+- **Dashboard**: `python main.py dashboard` → http://localhost:8501
+- **Worker**: `python main.py worker`
+- **Pipeline**: `python main.py pipeline`
+- **Verificar**: `python test_app.py`
 - **Logs**: `logs/worker.log`
 - **Config**: `config/settings.yaml`
-- **Tests**: `scripts/test_pipeline.py`
