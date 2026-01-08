@@ -50,7 +50,7 @@ Si todas las pruebas pasan, el sistema está listo para usar.
 
 ---
 
-## 📊 Dashboard Web
+## 📊 Dashboard Web Avanzado
 
 Lanza el dashboard interactivo para monitorear tu data lake en tiempo real:
 
@@ -58,15 +58,48 @@ Lanza el dashboard interactivo para monitorear tu data lake en tiempo real:
 python main.py dashboard
 ```
 
-El dashboard incluye:
-- 📁 Conteo de archivos RAW y procesados
-- 📬 Estado de la cola SQS
-- 🚨 Errores recientes (últimas 24h)
-- 📈 Gráficas de tendencias
-- 🔄 Auto-refresh cada 30 segundos
-- 🚦 Estado general del sistema
+### 🎯 **Características del Dashboard:**
 
-Accede en: http://localhost:8501
+#### **Métricas Principales (6 cards):**
+- 📁 **Archivos RAW** - Archivos sin procesar + tamaño total
+- ✅ **Procesados** - Archivos convertidos a Parquet + tamaño
+- 📊 **Total Datos** - Tamaño acumulado de todo el sistema
+- 🔥 **Hoy** - Archivos procesados en el día actual
+- 📬 **Cola SQS** - Mensajes pendientes de procesar
+- 🔴 **Errores (24h)** - Errores recientes del sistema
+
+#### **Análisis Avanzado (3 gráficas):**
+- 📈 **Archivos por Tipo** - Distribución de CSV, JSON, Parquet, etc.
+- 🍰 **Distribución por Carpetas** - RAW, Procesados, Athena-results
+- 📊 **Eficiencia del Sistema** - % de archivos procesados con barra de progreso
+
+#### **Estado del Sistema:**
+- 🚦 **Estado General** - Operativo/Problemas/Atención
+- 🤖 **Worker Status** - Detecta si el worker está corriendo (PID + tiempo activo)
+
+#### **Explorador de Archivos Avanzado:**
+- 🔍 **Filtros múltiples:**
+  - **Origen:** Procesados / RAW / Todos los buckets
+  - **Tipo:** Todos / parquet / jsonl / csv / json / txt / metadata
+  - **Fecha:** Filtro opcional por día específico
+- 📄 **Tabla optimizada:**
+  - Numeración automática (#)
+  - Columnas: Archivo, Tipo, Tamaño, Fecha
+  - Paginación inteligente (20 archivos por página)
+  - Selector de página en esquina inferior derecha
+
+### 🎮 **Cómo usar el Dashboard:**
+
+1. **Monitoreo general:** Las 6 métricas te dan una vista rápida del sistema
+2. **Análisis detallado:** Las 3 gráficas muestran distribuciones y eficiencia
+3. **Verificar worker:** La sección Worker Status te dice si está corriendo
+4. **Explorar archivos:** Usa los filtros para encontrar archivos específicos
+5. **Navegación:** Usa el selector de página para ver más archivos
+
+### ⚙️ **Configuración:**
+- **Auto-refresh:** Desactivado por defecto (activa manualmente si quieres)
+- **Cache:** 30 segundos para mejor rendimiento
+- **Acceso:** http://localhost:8501
 
 ---
 
@@ -319,10 +352,14 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 
 ## 11. 🚀 Extensiones y mejoras sugeridas
 ### Implementadas ✅
-- ✅ Dashboard web interactivo
-- ✅ Monitor de sistema en tiempo real
-- ✅ Métricas y visualizaciones
-- ✅ Auto-refresh y alertas visuales
+- ✅ Dashboard web interactivo con 6 métricas
+- ✅ Análisis avanzado con 3 gráficas interactivas
+- ✅ Explorador de archivos con filtros múltiples
+- ✅ Paginación inteligente y numeración
+- ✅ Worker status en tiempo real
+- ✅ Monitor de sistema integrado
+- ✅ Comandos CLI simplificados
+- ✅ Filtros S3 avanzados por fecha y tipo
 
 ### Por implementar 🚧
 - Validación de esquema de datos
