@@ -39,11 +39,11 @@ def load_config():
 
 def run_worker():
     """Ejecutar el worker SQS para procesamiento automático"""
-    logger.info("Iniciando SQS Worker...")
+    logger.info(" Iniciando SQS Worker...")
     config = load_config()
     
     def handle_message(message):
-        logger.info(f"Procesando mensaje: {message['Body']}")
+        logger.info(f" Procesando mensaje: {message['Body']}")
         return True
     
     run_sqs_worker(
@@ -56,7 +56,7 @@ def run_worker():
 
 def run_glue_catalog():
     """Actualizar catálogo de Glue"""
-    logger.info("Actualizando catálogo de Glue...")
+    logger.info(" Actualizando catálogo de Glue...")
     config = load_config()
     catalog = GlueCatalogManager(config['glue']['database_name'])
     
@@ -65,11 +65,11 @@ def run_glue_catalog():
     
     # Listar tablas existentes
     tables = catalog.list_tables()
-    logger.info(f"Tablas registradas: {tables}")
+    logger.info(f" Tablas registradas: {tables}")
 
 def run_athena_query():
     """Ejecutar consulta de ejemplo en Athena"""
-    logger.info("Ejecutando consulta en Athena...")
+    logger.info(" Ejecutando consulta en Athena...")
     
     # Ejecutar athena_query_example.py con el PYTHONPATH correcto
     env = os.environ.copy()
@@ -82,14 +82,14 @@ def run_athena_query():
     )
     
     if result.returncode == 0:
-        logger.info("Consulta Athena ejecutada exitosamente")
+        logger.info(" Consulta Athena ejecutada exitosamente")
     else:
-        logger.error("Error en consulta Athena")
+        logger.error(" Error en consulta Athena")
         sys.exit(1)
 
 def run_dashboard():
     """Ejecutar dashboard de Streamlit"""
-    logger.info("Iniciando dashboard de Streamlit...")
+    logger.info(" Iniciando dashboard de Streamlit...")
     
     # Ejecutar streamlit con el PYTHONPATH correcto
     env = os.environ.copy()
@@ -102,12 +102,12 @@ def run_dashboard():
     )
     
     if result.returncode != 0:
-        logger.error("Error ejecutando dashboard")
+        logger.error(" Error ejecutando dashboard")
         sys.exit(1)
 
 def run_test_pipeline():
     """Ejecutar pipeline de prueba"""
-    logger.info("Ejecutando pipeline de prueba...")
+    logger.info(" Ejecutando pipeline de prueba...")
     
     # Ejecutar test_pipeline.py con el PYTHONPATH correcto
     env = os.environ.copy()
@@ -120,9 +120,9 @@ def run_test_pipeline():
     )
     
     if result.returncode == 0:
-        logger.info("Pipeline de prueba ejecutado exitosamente")
+        logger.info(" Pipeline de prueba ejecutado exitosamente")
     else:
-        logger.error("Error en pipeline de prueba")
+        logger.error(" Error en pipeline de prueba")
         sys.exit(1)
 
 def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: str = None, latest: int = None):

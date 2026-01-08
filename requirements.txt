@@ -7,3 +7,4 @@ plotly
 fastapi
 uvicorn[standard]
 requests
+psutil
