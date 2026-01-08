@@ -212,7 +212,6 @@ python main.py s3-sync --bucket tu-bucket --prefix processed/ --limit 10
 - ✅ Ordenado por más recientes
 - ✅ Contador total de archivos
 
-### **💰 Costo:** Prácticamente gratis (centavos al mes)
 
 ---
 
