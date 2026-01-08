@@ -54,7 +54,7 @@ def run_worker():
         max_empty_polls=5
     )
 
-def run_catalog_update():
+def run_glue_catalog():
     """Actualizar catálogo de Glue"""
     logger.info("Actualizando catálogo de Glue...")
     config = load_config()
@@ -66,6 +66,26 @@ def run_catalog_update():
     # Listar tablas existentes
     tables = catalog.list_tables()
     logger.info(f"Tablas registradas: {tables}")
+
+def run_athena_query():
+    """Ejecutar consulta de ejemplo en Athena"""
+    logger.info("Ejecutando consulta en Athena...")
+    
+    # Ejecutar athena_query_example.py con el PYTHONPATH correcto
+    env = os.environ.copy()
+    env['PYTHONPATH'] = 'src'
+    
+    result = subprocess.run(
+        [sys.executable, 'scripts/athena_query_example.py'],
+        env=env,
+        cwd=Path(__file__).parent
+    )
+    
+    if result.returncode == 0:
+        logger.info("Consulta Athena ejecutada exitosamente")
+    else:
+        logger.error("Error en consulta Athena")
+        sys.exit(1)
 
 def run_dashboard():
     """Ejecutar dashboard de Streamlit"""
@@ -121,7 +141,7 @@ def run_s3_sync(bucket: str, prefix: str = ""):
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='AWS Data Lake Control')
-    parser.add_argument('command', choices=['worker', 'catalog', 's3-sync', 'pipeline', 'dashboard'], 
+    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 'pipeline', 'dashboard', 'athena'], 
                        help='Comando a ejecutar')
     parser.add_argument('--bucket', help='Bucket S3 para sincronización')
     parser.add_argument('--prefix', default='', help='Prefijo S3')
@@ -131,8 +151,8 @@ def main():
     try:
         if args.command == 'worker':
             run_worker()
-        elif args.command == 'catalog':
-            run_catalog_update()
+        elif args.command == 'glue':
+            run_glue_catalog()
         elif args.command == 's3-sync':
             if not args.bucket:
                 logger.error("--bucket es requerido para s3-sync")
@@ -140,6 +160,8 @@ def main():
             run_s3_sync(args.bucket, args.prefix)
         elif args.command == 'pipeline':
             run_test_pipeline()
+        elif args.command == 'athena':
+            run_athena_query()
         elif args.command == 'dashboard':
             run_dashboard()
             

@@ -110,9 +110,15 @@ Sube archivo de prueba y activa el flujo completo.
 
 ### Actualizar catálogo de Glue
 ```bash
-python main.py catalog
+python main.py glue
 ```
-Actualiza las tablas de Glue una sola vez.
+Registra archivos Parquet como tablas SQL.
+
+### Consultar con Athena
+```bash
+python main.py athena
+```
+Ejecuta consulta SQL de ejemplo sobre los datos.
 
 ### Sincronizar con S3
 ```bash
@@ -240,7 +246,10 @@ python main.py dashboard
 python main.py pipeline
 
 # Actualizar catálogo
-python main.py catalog
+python main.py glue
+
+# Consultar con Athena
+python main.py athena
 
 # Ver archivos S3
 python main.py s3-sync --bucket tu-bucket
@@ -292,6 +301,8 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 - **Dashboard**: `python main.py dashboard` → http://localhost:8501
 - **Worker**: `python main.py worker`
 - **Pipeline**: `python main.py pipeline`
+- **Glue**: `python main.py glue`
+- **Athena**: `python main.py athena`
 - **Verificar**: `python test_app.py`
 - **Logs**: `logs/worker.log`
 - **Config**: `config/settings.yaml`
