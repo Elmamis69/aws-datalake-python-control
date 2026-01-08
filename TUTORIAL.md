@@ -122,10 +122,25 @@ Ejecuta consulta SQL de ejemplo sobre los datos.
 
 ### Sincronizar con S3
 ```bash
+# Ver todos los archivos
 python main.py s3-sync --bucket tu-bucket-name
+
+# Ver archivos de una carpeta específica
 python main.py s3-sync --bucket tu-bucket --prefix processed/
+
+# Limitar número de archivos mostrados
+python main.py s3-sync --bucket tu-bucket --prefix raw/ --limit 5
+
+# Ver archivos de una fecha específica
+python main.py s3-sync --bucket tu-bucket --prefix raw/ --date 2026-01-08
+
+# Ver los últimos N archivos subidos (más recientes)
+python main.py s3-sync --bucket tu-bucket --latest 3
+
+# Combinar filtros: últimos 5 archivos de hoy
+python main.py s3-sync --bucket tu-bucket --latest 5 --date 2026-01-08
 ```
-Lista archivos en S3 con filtros opcionales.
+Explora archivos en S3 con filtros avanzados por fecha y cantidad.
 
 ---
 
@@ -167,15 +182,37 @@ Esto simula la llegada de un archivo nuevo y activa el flujo completo.
 
 ---
 
-## 6. Listar archivos procesados en S3 desde Python
+## 6. 📁 Explorar archivos S3 (avanzado)
 
-Para ver los archivos Parquet generados en la ruta de salida:
+El comando `s3-sync` tiene filtros potentes para encontrar exactamente lo que necesitas:
 
-```powershell
-$env:PYTHONPATH="src"; & ".venv/Scripts/python.exe" "scripts/list_s3_processed.py"
+```bash
+# "Muéstrame los últimos 3 archivos que se subieron"
+python main.py s3-sync --bucket tu-bucket --latest 3
+
+# "¿Qué archivos llegaron el 8 de enero?"
+python main.py s3-sync --bucket tu-bucket --date 2026-01-08
+
+# "Los últimos 5 archivos de hoy en la carpeta RAW"
+python main.py s3-sync --bucket tu-bucket --prefix raw/ --latest 5 --date 2026-01-08
+
+# "Solo muéstrame 10 archivos de la carpeta procesados"
+python main.py s3-sync --bucket tu-bucket --prefix processed/ --limit 10
 ```
 
-Puedes modificar la fecha en el script para buscar otros días.
+### **Parámetros disponibles:**
+- `--prefix carpeta/` - Filtrar por carpeta
+- `--date YYYY-MM-DD` - Filtrar por fecha específica
+- `--latest N` - Los N archivos más recientes
+- `--limit N` - Máximo N archivos a mostrar
+
+### **Información mostrada:**
+- ✅ Ruta completa del archivo
+- ✅ Fecha y hora de subida
+- ✅ Ordenado por más recientes
+- ✅ Contador total de archivos
+
+### **💰 Costo:** Prácticamente gratis (centavos al mes)
 
 ---
 
@@ -251,8 +288,11 @@ python main.py glue
 # Consultar con Athena
 python main.py athena
 
-# Ver archivos S3
+# Ver archivos S3 (básico)
 python main.py s3-sync --bucket tu-bucket
+
+# Ver archivos S3 (avanzado)
+python main.py s3-sync --bucket tu-bucket --latest 5 --date 2026-01-08
 ```
 
 ### Monitor puntual (método anterior)
@@ -303,6 +343,8 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 - **Pipeline**: `python main.py pipeline`
 - **Glue**: `python main.py glue`
 - **Athena**: `python main.py athena`
+- **S3 (básico)**: `python main.py s3-sync --bucket tu-bucket`
+- **S3 (filtros)**: `python main.py s3-sync --bucket tu-bucket --latest 3`
 - **Verificar**: `python test_app.py`
 - **Logs**: `logs/worker.log`
 - **Config**: `config/settings.yaml`

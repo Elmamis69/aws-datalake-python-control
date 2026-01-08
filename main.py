@@ -125,18 +125,49 @@ def run_test_pipeline():
         logger.error("Error en pipeline de prueba")
         sys.exit(1)
 
-def run_s3_sync(bucket: str, prefix: str = ""):
+def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: str = None, latest: int = None):
     """Sincronizar archivos con S3"""
-    logger.info(f"Sincronizando con S3: {bucket}/{prefix}")
+    logger.info(f" Sincronizando con S3: {bucket}/{prefix}")
     s3 = boto3.client('s3')
     
-    # Listar archivos procesados
+    # Listar archivos
     response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-    files = [obj['Key'] for obj in response.get('Contents', [])]
-    logger.info(f"Archivos encontrados: {len(files)}")
+    objects = response.get('Contents', [])
     
-    for file in files[:5]:  # Mostrar primeros 5
-        logger.info(f"  - {file}")
+    # Filtrar por fecha si se especifica
+    if date_filter:
+        from datetime import datetime
+        try:
+            # Formato: YYYY-MM-DD
+            filter_date = datetime.strptime(date_filter, '%Y-%m-%d').date()
+            objects = [obj for obj in objects if obj['LastModified'].date() == filter_date]
+            logger.info(f" Filtrado por fecha {date_filter}")
+        except ValueError:
+            logger.error(" Formato de fecha inválido. Use YYYY-MM-DD (ej: 2026-01-08)")
+            return
+    
+    # Ordenar por fecha (más recientes primero) si se pide los últimos
+    if latest:
+        objects = sorted(objects, key=lambda x: x['LastModified'], reverse=True)
+        objects = objects[:latest]
+        logger.info(f" Mostrando los últimos {latest} archivos")
+    
+    files = [obj['Key'] for obj in objects]
+    logger.info(f" Archivos encontrados: {len(files)}")
+    
+    # Mostrar archivos según el límite
+    if limit is None:
+        # Mostrar todos los archivos
+        for i, obj in enumerate(objects):
+            date_str = obj['LastModified'].strftime('%Y-%m-%d %H:%M:%S')
+            logger.info(f"  - {obj['Key']} (subido: {date_str})")
+    else:
+        # Mostrar solo los primeros N archivos
+        for i, obj in enumerate(objects[:limit]):
+            date_str = obj['LastModified'].strftime('%Y-%m-%d %H:%M:%S')
+            logger.info(f"  - {obj['Key']} (subido: {date_str})")
+        if len(objects) > limit:
+            logger.info(f"  ... y {len(objects) - limit} archivos más")
 
 def main():
     """Función principal"""
@@ -145,6 +176,9 @@ def main():
                        help='Comando a ejecutar')
     parser.add_argument('--bucket', help='Bucket S3 para sincronización')
     parser.add_argument('--prefix', default='', help='Prefijo S3')
+    parser.add_argument('--limit', type=int, help='Número máximo de archivos a mostrar (default: todos)')
+    parser.add_argument('--date', help='Filtrar por fecha (formato: YYYY-MM-DD, ej: 2026-01-08)')
+    parser.add_argument('--latest', type=int, help='Mostrar los N archivos más recientes')
     
     args = parser.parse_args()
     
@@ -157,7 +191,7 @@ def main():
             if not args.bucket:
                 logger.error("--bucket es requerido para s3-sync")
                 sys.exit(1)
-            run_s3_sync(args.bucket, args.prefix)
+            run_s3_sync(args.bucket, args.prefix, args.limit, args.date, args.latest)
         elif args.command == 'pipeline':
             run_test_pipeline()
         elif args.command == 'athena':
