@@ -17,6 +17,7 @@ sys.path.append(str(Path(__file__).parent / "src"))
 from src.datalake.sqs_worker import run_sqs_worker
 from src.datalake.s3_io import read_s3_object, write_parquet_to_s3
 from src.glue_catalog import GlueCatalogManager
+from src.file_reader import run_read_files
 import boto3
 
 # Configurar logging
@@ -172,7 +173,7 @@ def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: s
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='AWS Data Lake Control')
-    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 'pipeline', 'dashboard', 'athena'], 
+    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 'pipeline', 'dashboard', 'athena', 'read'], 
                        help='Comando a ejecutar')
     parser.add_argument('--bucket', help='Bucket S3 para sincronización')
     parser.add_argument('--prefix', default='', help='Prefijo S3')
@@ -196,6 +197,9 @@ def main():
             run_test_pipeline()
         elif args.command == 'athena':
             run_athena_query()
+        elif args.command == 'read':
+            config = load_config()
+            run_read_files(config)
         elif args.command == 'dashboard':
             run_dashboard()
             

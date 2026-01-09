@@ -269,6 +269,7 @@ def get_files_advanced_filter(aws_conf, selected_date=None, file_type=None, sour
             filtered_files.append({
                 'nombre': obj['Key'].split('/')[-1],
                 'ruta': obj['Key'],
+                'bucket': bucket,
                 'tamaño': format_size(obj['Size']),
                 'fecha': obj['LastModified'].strftime('%Y-%m-%d %H:%M:%S'),
                 'tipo': obj['Key'].split('.')[-1].lower() if '.' in obj['Key'] else 'sin_ext'
@@ -280,6 +281,44 @@ def get_files_advanced_filter(aws_conf, selected_date=None, file_type=None, sour
         return filtered_files
     except Exception:
         return []
+
+def read_file_from_s3(bucket, key, file_type):
+    """Leer archivo desde S3 y retornar DataFrame"""
+    try:
+        import boto3
+        import pandas as pd
+        
+        s3_path = f"s3://{bucket}/{key}"
+        
+        if file_type == 'parquet':
+            df = pd.read_parquet(s3_path)
+        elif file_type in ['json', 'jsonl']:
+            df = pd.read_json(s3_path, lines=True if file_type == 'jsonl' else False)
+        elif file_type == 'csv':
+            df = pd.read_csv(s3_path)
+        else:
+            return None, f"Tipo de archivo no soportado: {file_type}"
+        
+        return df, None
+    except Exception as e:
+        return None, f"Error leyendo archivo: {str(e)}"
+
+def download_file_from_s3(bucket, key):
+    """Descargar archivo desde S3 y retornar contenido"""
+    try:
+        import boto3
+        import io
+        
+        s3 = boto3.client('s3')
+        
+        # Crear buffer en memoria
+        buffer = io.BytesIO()
+        s3.download_fileobj(bucket, key, buffer)
+        buffer.seek(0)
+        
+        return buffer.getvalue(), None
+    except Exception as e:
+        return None, f"Error descargando archivo: {str(e)}"
 
 def check_worker_status():
     """Verificar si el worker está corriendo"""
@@ -604,16 +643,19 @@ def main():
         for i, file_info in enumerate(display_files):
             file_info['#'] = start_idx + i + 1
         
-        # Crear DataFrame con numeración
+        # Crear DataFrame con numeración (sin mostrar bucket y ruta)
         df_filtered = pd.DataFrame(display_files)
         
-        # Reordenar columnas para poner # al principio
+        # Reordenar columnas para poner # al principio (sin bucket y ruta para la vista)
         columns_order = ['#', 'nombre', 'tipo', 'tamaño', 'fecha']
-        df_filtered = df_filtered[columns_order]
+        df_display = df_filtered[columns_order]
+        
+        # Agregar indicador de archivos legibles
+        df_display['📖'] = ['✅' if f['tipo'] in ['parquet', 'json', 'jsonl', 'csv'] else '❌' for f in display_files]
         
         # Mostrar tabla
         st.dataframe(
-            df_filtered,
+            df_display,
             column_config={
                 "#": st.column_config.NumberColumn(
                     "#",
@@ -639,6 +681,11 @@ def main():
                     "Fecha",
                     help="Fecha de creación/modificación",
                     width=150
+                ),
+                "📖": st.column_config.TextColumn(
+                    "Legible",
+                    help="✅ = Se puede leer y analizar, ❌ = Solo descarga",
+                    width=70
                 )
             },
             hide_index=True,
@@ -661,6 +708,308 @@ def main():
                     st.rerun()
     else:
         st.info("🔍 No se encontraron archivos con los filtros seleccionados")
+    
+    # Lector de archivos
+    st.markdown("---")
+    st.subheader("📖 Lector de Archivos")
+    
+    # Selector de archivo para leer - TODOS los archivos
+    if filtered_files:
+        col1, col2, col3 = st.columns([3, 1, 1])
+        
+        with col1:
+            # Crear opciones para el selectbox - TODOS los archivos (sin límite)
+            file_options = {}
+            for i, file_info in enumerate(filtered_files):  # Sin límite de 50
+                display_name = f"{i+1:2d}. {file_info['nombre']} ({file_info['tipo'].upper()}, {file_info['tamaño']})"
+                file_options[display_name] = file_info
+            
+            selected_file_display = st.selectbox(
+                f"Selecciona un archivo ({len(filtered_files)} disponibles):",
+                options=list(file_options.keys()),
+                index=0 if file_options else None
+            )
+        
+        with col2:
+            # Botón para leer (solo archivos compatibles)
+            if selected_file_display:
+                selected_file = file_options[selected_file_display]
+                is_readable = selected_file['tipo'] in ['parquet', 'json', 'jsonl', 'csv']
+                
+                read_button = st.button(
+                    "📖 Leer Archivo", 
+                    type="primary",
+                    disabled=not is_readable,
+                    help="Solo archivos parquet, json, jsonl, csv" if not is_readable else "Leer y analizar archivo"
+                )
+        
+        with col3:
+            # Botón para descargar (todos los archivos)
+            if selected_file_display:
+                download_button = st.button(
+                    "⬇️ Descargar", 
+                    type="secondary",
+                    help="Descargar archivo completo"
+                )
+        
+        # Mostrar información del archivo seleccionado
+        if selected_file_display:
+            selected_file = file_options[selected_file_display]
+            
+            # Info del archivo
+            st.info(f"📁 **Archivo:** {selected_file['nombre']} | **Tipo:** {selected_file['tipo'].upper()} | **Tamaño:** {selected_file['tamaño']} | **Fecha:** {selected_file['fecha']}")
+            
+            # Descargar archivo
+            if download_button:
+                with st.spinner(f"Descargando {selected_file['nombre']}..."):
+                    file_content, error = download_file_from_s3(
+                        selected_file['bucket'],
+                        selected_file['ruta']
+                    )
+                
+                if error:
+                    st.error(f"❌ {error}")
+                else:
+                    st.success(f"✅ Archivo descargado: **{selected_file['nombre']}**")
+                    
+                    # Botón de descarga
+                    st.download_button(
+                        label="💾 Guardar archivo",
+                        data=file_content,
+                        file_name=selected_file['nombre'],
+                        mime="application/octet-stream"
+                    )
+            
+            # Leer archivo (solo si es compatible)
+            if read_button and is_readable:
+                with st.spinner(f"Leyendo {selected_file['nombre']}..."):
+                    df, error = read_file_from_s3(
+                        selected_file['bucket'],
+                        selected_file['ruta'],
+                        selected_file['tipo']
+                    )
+                
+                if error:
+                    st.error(f"❌ {error}")
+                else:
+                    st.success(f"✅ Archivo leído exitosamente: **{selected_file['nombre']}**")
+                    
+                    # Información del DataFrame
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("📊 Filas", f"{df.shape[0]:,}")
+                    with col2:
+                        st.metric("📋 Columnas", df.shape[1])
+                    with col3:
+                        memory_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
+                        st.metric("💾 Memoria", f"{memory_mb:.1f} MB")
+                    with col4:
+                        # Botón para abrir en nueva pestaña (exportar como CSV)
+                        csv_data = df.to_csv(index=False)
+                        st.download_button(
+                            "🔗 Exportar CSV",
+                            data=csv_data,
+                            file_name=f"{selected_file['nombre'].split('.')[0]}_export.csv",
+                            mime="text/csv",
+                            help="Descargar como CSV para abrir en Excel/Google Sheets"
+                        )
+                    
+                    # Tabs para diferentes vistas
+                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔍 Vista Previa", "📊 Estadísticas", "🏷️ Tipos de Datos", "📈 Gráficas", "🔍 Explorar"])
+                    
+                    with tab1:
+                        # Controles de vista previa
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            show_rows = st.slider("Filas a mostrar:", 5, min(100, len(df)), 10)
+                        with col2:
+                            view_mode = st.radio("Vista:", ["Primeras filas", "Últimas filas", "Muestra aleatoria"], horizontal=True)
+                        
+                        if view_mode == "Primeras filas":
+                            st.write(f"**Primeras {show_rows} filas:**")
+                            st.dataframe(df.head(show_rows), use_container_width=True)
+                        elif view_mode == "Últimas filas":
+                            st.write(f"**Últimas {show_rows} filas:**")
+                            st.dataframe(df.tail(show_rows), use_container_width=True)
+                        else:
+                            st.write(f"**Muestra aleatoria de {show_rows} filas:**")
+                            st.dataframe(df.sample(min(show_rows, len(df))), use_container_width=True)
+                    
+                    with tab2:
+                        # Estadísticas básicas
+                        numeric_cols = df.select_dtypes(include=['number']).columns
+                        if len(numeric_cols) > 0:
+                            st.write("**Estadísticas de columnas numéricas:**")
+                            st.dataframe(df[numeric_cols].describe(), use_container_width=True)
+                        
+                        # Información general
+                        st.write("**Resumen por columna:**")
+                        info_data = {
+                            'Columna': df.columns,
+                            'Tipo': [str(dtype) for dtype in df.dtypes],
+                            'No Nulos': [f"{df[col].count():,}" for col in df.columns],
+                            'Nulos': [f"{df[col].isnull().sum():,}" for col in df.columns],
+                            '% Nulos': [f"{(df[col].isnull().sum() / len(df) * 100):.1f}%" for col in df.columns],
+                            'Únicos': [f"{df[col].nunique():,}" for col in df.columns]
+                        }
+                        info_df = pd.DataFrame(info_data)
+                        st.dataframe(info_df, use_container_width=True)
+                    
+                    with tab3:
+                        st.write("**Análisis detallado por columna:**")
+                        
+                        # Selector de columna
+                        selected_col = st.selectbox("Selecciona una columna:", df.columns)
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Información de '{selected_col}':**")
+                            col_info = {
+                                'Tipo de dato': str(df[selected_col].dtype),
+                                'Valores totales': f"{len(df):,}",
+                                'Valores únicos': f"{df[selected_col].nunique():,}",
+                                'Valores nulos': f"{df[selected_col].isnull().sum():,}",
+                                'Porcentaje nulos': f"{(df[selected_col].isnull().sum() / len(df) * 100):.2f}%"
+                            }
+                            
+                            for key, value in col_info.items():
+                                st.write(f"- **{key}:** {value}")
+                        
+                        with col2:
+                            st.write(f"**Valores más frecuentes en '{selected_col}':**")
+                            if df[selected_col].nunique() <= 50:
+                                value_counts = df[selected_col].value_counts().head(10)
+                                st.dataframe(value_counts.to_frame('Frecuencia'), use_container_width=True)
+                            else:
+                                st.info("Demasiados valores únicos para mostrar frecuencias")
+                    
+                    with tab4:
+                        # Gráficas automáticas mejoradas
+                        numeric_cols = df.select_dtypes(include=['number']).columns
+                        
+                        if len(numeric_cols) > 0:
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # Selector de columna numérica
+                                selected_numeric = st.selectbox("Columna numérica:", numeric_cols)
+                                
+                                # Histograma
+                                st.write(f"**Distribución de {selected_numeric}:**")
+                                fig_hist = px.histogram(df, x=selected_numeric, nbins=30)
+                                fig_hist.update_layout(height=400)
+                                st.plotly_chart(fig_hist, use_container_width=True)
+                            
+                            with col2:
+                                if len(numeric_cols) > 1:
+                                    # Box plot
+                                    st.write(f"**Box Plot de {selected_numeric}:**")
+                                    fig_box = px.box(df, y=selected_numeric)
+                                    fig_box.update_layout(height=400)
+                                    st.plotly_chart(fig_box, use_container_width=True)
+                            
+                            # Matriz de correlación si hay múltiples columnas
+                            if len(numeric_cols) > 1:
+                                st.write("**Matriz de correlación:**")
+                                corr_matrix = df[numeric_cols].corr()
+                                fig_corr = px.imshow(corr_matrix, 
+                                                   text_auto=True, 
+                                                   aspect="auto",
+                                                   color_continuous_scale='RdBu')
+                                fig_corr.update_layout(height=500)
+                                st.plotly_chart(fig_corr, use_container_width=True)
+                        
+                        # Gráficas categóricas
+                        categorical_cols = df.select_dtypes(include=['object', 'string']).columns
+                        if len(categorical_cols) > 0:
+                            selected_cat = st.selectbox("Columna categórica:", categorical_cols)
+                            
+                            if df[selected_cat].nunique() <= 20:
+                                st.write(f"**Conteo de valores en {selected_cat}:**")
+                                value_counts = df[selected_cat].value_counts().head(15)
+                                fig_bar = px.bar(x=value_counts.values, y=value_counts.index, orientation='h')
+                                fig_bar.update_layout(height=400)
+                                st.plotly_chart(fig_bar, use_container_width=True)
+                    
+                    with tab5:
+                        st.write("**🔍 Explorador de datos avanzado:**")
+                        
+                        # Filtros dinámicos
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Filtro por columna
+                            filter_col = st.selectbox("Filtrar por columna:", ['Ninguno'] + list(df.columns))
+                            
+                            if filter_col != 'Ninguno':
+                                unique_values = df[filter_col].dropna().unique()
+                                if len(unique_values) <= 50:
+                                    selected_values = st.multiselect(
+                                        f"Valores de {filter_col}:",
+                                        options=unique_values,
+                                        default=unique_values[:5] if len(unique_values) > 5 else unique_values
+                                    )
+                                    
+                                    if selected_values:
+                                        filtered_df = df[df[filter_col].isin(selected_values)]
+                                    else:
+                                        filtered_df = df
+                                else:
+                                    st.info("Demasiados valores únicos para filtrar")
+                                    filtered_df = df
+                            else:
+                                filtered_df = df
+                        
+                        with col2:
+                            # Búsqueda de texto
+                            search_term = st.text_input("Buscar en todas las columnas:")
+                            
+                            if search_term:
+                                # Buscar en todas las columnas de texto
+                                text_cols = df.select_dtypes(include=['object', 'string']).columns
+                                mask = pd.Series([False] * len(filtered_df))
+                                
+                                for col in text_cols:
+                                    mask |= filtered_df[col].astype(str).str.contains(search_term, case=False, na=False)
+                                
+                                if mask.any():
+                                    filtered_df = filtered_df[mask]
+                                    st.success(f"Encontradas {len(filtered_df)} filas con '{search_term}'")
+                                else:
+                                    st.warning(f"No se encontraron resultados para '{search_term}'")
+                        
+                        # Mostrar datos filtrados
+                        if len(filtered_df) > 0:
+                            st.write(f"**Datos filtrados ({len(filtered_df):,} filas):**")
+                            
+                            # Paginación para datos filtrados
+                            rows_per_page = st.slider("Filas por página:", 10, 100, 25)
+                            total_pages = (len(filtered_df) + rows_per_page - 1) // rows_per_page
+                            
+                            if total_pages > 1:
+                                page = st.selectbox(f"Página (1-{total_pages}):", range(1, total_pages + 1))
+                                start_idx = (page - 1) * rows_per_page
+                                end_idx = start_idx + rows_per_page
+                                display_df = filtered_df.iloc[start_idx:end_idx]
+                            else:
+                                display_df = filtered_df
+                            
+                            st.dataframe(display_df, use_container_width=True)
+                            
+                            # Exportar datos filtrados
+                            if len(filtered_df) != len(df):
+                                csv_filtered = filtered_df.to_csv(index=False)
+                                st.download_button(
+                                    "📥 Exportar datos filtrados",
+                                    data=csv_filtered,
+                                    file_name=f"{selected_file['nombre'].split('.')[0]}_filtrado.csv",
+                                    mime="text/csv"
+                                )
+                        else:
+                            st.warning("No hay datos que mostrar con los filtros aplicados")
+    else:
+        st.info("Primero busca archivos para poder leerlos")
     
     # Errores recientes
     if metrics['errors']:

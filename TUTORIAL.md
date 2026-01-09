@@ -77,6 +77,19 @@ python main.py dashboard
 - 🚦 **Estado General** - Operativo/Problemas/Atención
 - 🤖 **Worker Status** - Detecta si el worker está corriendo (PID + tiempo activo)
 
+#### **Lector de Archivos Integrado (¡NUEVO!):**
+- 📖 **Selección interactiva** - Elige cualquier archivo de la lista numerada
+- 📁 **Todos los tipos** - Parquet, JSON, JSONL, CSV, TXT, Metadata
+- ⬇️ **Descarga directa** - Botón para descargar archivos completos
+- 📈 **Análisis completo** - 5 pestañas de exploración de datos:
+  1. **🔍 Vista Previa** - Primeras/últimas/aleatorias filas
+  2. **📊 Estadísticas** - Descripción completa y análisis de nulos
+  3. **🏷️ Tipos de Datos** - Análisis detallado por columna
+  4. **📈 Gráficas** - Histogramas, correlaciones, box plots
+  5. **🔍 Explorar** - Filtros dinámicos y búsqueda de texto
+- 📥 **Exportar datos** - CSV para Excel/Google Sheets
+- 🔍 **Filtros avanzados** - Por columna y búsqueda de texto
+
 #### **Explorador de Archivos Avanzado:**
 - 🔍 **Filtros múltiples:**
   - **Origen:** Procesados / RAW / Todos los buckets
@@ -94,7 +107,10 @@ python main.py dashboard
 2. **Análisis detallado:** Las 3 gráficas muestran distribuciones y eficiencia
 3. **Verificar worker:** La sección Worker Status te dice si está corriendo
 4. **Explorar archivos:** Usa los filtros para encontrar archivos específicos
-5. **Navegación:** Usa el selector de página para ver más archivos
+5. **Leer archivos:** Selecciona cualquier archivo y usa "Leer Archivo" para análisis completo
+6. **Descargar archivos:** Botón "Descargar" para cualquier tipo de archivo
+7. **Exportar datos:** Usa "Exportar CSV" para abrir en Excel/Google Sheets
+8. **Navegación:** Usa el selector de página para ver más archivos
 
 ### ⚙️ **Configuración:**
 - **Auto-refresh:** Desactivado por defecto (activa manualmente si quieres)
@@ -153,6 +169,12 @@ python main.py athena
 ```
 Ejecuta consulta SQL de ejemplo sobre los datos.
 
+### Leer archivos desde terminal (¡NUEVO!)
+```bash
+python main.py read
+```
+Lector interactivo de archivos con análisis completo de datos.
+
 ### Sincronizar con S3
 ```bash
 # Ver todos los archivos
@@ -174,6 +196,85 @@ python main.py s3-sync --bucket tu-bucket --latest 3
 python main.py s3-sync --bucket tu-bucket --latest 5 --date 2026-01-08
 ```
 Explora archivos en S3 con filtros avanzados por fecha y cantidad.
+
+---
+
+## 📖 Lector de Archivos Interactivo (¡NUEVO!)
+
+Lee y analiza cualquier archivo de tu data lake directamente desde la terminal:
+
+```bash
+python main.py read
+```
+
+### 🎯 **Características del Lector:**
+
+#### **📁 Selección de archivos:**
+- **Lista completa** - Ve todos los archivos disponibles (RAW + Procesados)
+- **Tabla organizada** - Número, nombre, tipo, tamaño, origen, ruta completa
+- **Selección interactiva** - Escribe el número o presiona ENTER para el más reciente
+- **Tipos soportados** - Parquet, JSON, JSONL, CSV, TXT, Metadata
+
+#### **📊 Análisis completo de datos:**
+- **Información básica** - Dimensiones, memoria, columnas
+- **Vista previa** - Primeras 5 filas con formato limpio
+- **Estadísticas numéricas** - Descripción completa (mean, std, min, max, etc.)
+- **Información de columnas** - Tipos, nulos, valores únicos
+- **Valores categóricos** - Top 5 valores más frecuentes
+
+#### **📄 Archivos de texto y metadata:**
+- **Múltiples codificaciones** - UTF-8, Latin-1, ASCII, CP1252
+- **Archivos binarios** - Muestra contenido hexadecimal si no es texto
+- **Metadata de Athena** - Lee archivos .metadata con información de consultas
+- **Truncamiento inteligente** - Limita contenido largo para mejor legibilidad
+
+### 🚀 **Cómo usar:**
+
+1. **Ejecutar comando:**
+   ```bash
+   python main.py read
+   ```
+
+2. **Ver lista de archivos:**
+   ```
+   📁 ARCHIVOS DISPONIBLES (40):
+   #    Archivo                             Tipo       Tamaño     Origen          Ruta Completa
+   1    test_20260108_002247.jsonl          JSONL      159B       RAW-Todos       raw/events/incoming/test_20260108_002247.jsonl
+   2    metadata.csv                        CSV        1.2KB      RAW-Todos       athena-results/metadata.csv
+   3    test.parquet                        PARQUET    2.3KB      Procesados      processed/events/test.parquet
+   ```
+
+3. **Seleccionar archivo:**
+   ```
+   🎯 Selecciona archivo (1-40) o ENTER para el más reciente: 3
+   📖 Seleccionado: test.parquet
+   ```
+
+4. **Ver análisis completo:**
+   ```
+   📊 RESUMEN DEL ARCHIVO
+   📁 Archivo: test.parquet
+   📌 Ruta: processed/events/test.parquet
+   📊 Dimensiones: 1,234 filas × 5 columnas
+   💾 Memoria: 45.2 KB
+   📋 Columnas: event_time, user_id, action, value, category
+   
+   🔍 VISTA PREVIA (primeras 5 filas)
+   [tabla con datos]
+   
+   📈 ESTADÍSTICAS NUMÉRICAS
+   [estadísticas detalladas]
+   
+   🏷️ INFORMACIÓN DE COLUMNAS
+   [tipos, nulos, únicos por columna]
+   ```
+
+### 💡 **Ventajas:**
+- **Sin configuración** - Funciona inmediatamente
+- **Todos los archivos** - Ve archivos de cualquier carpeta (RAW, procesados, athena-results)
+- **Análisis instantáneo** - Estadísticas completas sin escribir código
+- **Interfaz limpia** - Salida organizada y fácil de leer
+- **Manejo robusto** - Soporta diferentes codificaciones y archivos binarios
 
 ---
 
@@ -320,6 +421,9 @@ python main.py glue
 # Consultar con Athena
 python main.py athena
 
+# Leer archivos desde terminal
+python main.py read
+
 # Ver archivos S3 (básico)
 python main.py s3-sync --bucket tu-bucket
 
@@ -355,6 +459,12 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 - ✅ Dashboard web interactivo con 6 métricas
 - ✅ Análisis avanzado con 3 gráficas interactivas
 - ✅ Explorador de archivos con filtros múltiples
+- ✅ Lector de archivos integrado en dashboard (5 pestañas)
+- ✅ Lector de archivos interactivo por terminal
+- ✅ Descarga de archivos desde dashboard
+- ✅ Soporte para todos los tipos de archivo (parquet, json, csv, txt, metadata)
+- ✅ Análisis completo de datos con estadísticas y gráficas
+- ✅ Manejo robusto de codificaciones y archivos binarios
 - ✅ Paginación inteligente y numeración
 - ✅ Worker status en tiempo real
 - ✅ Monitor de sistema integrado
@@ -375,6 +485,7 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 
 ### 📱 Accesos rápidos
 - **Dashboard**: `python main.py dashboard` → http://localhost:8501
+- **Lector de archivos**: `python main.py read`
 - **Worker**: `python main.py worker`
 - **Pipeline**: `python main.py pipeline`
 - **Glue**: `python main.py glue`
