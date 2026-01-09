@@ -90,32 +90,70 @@ python main.py dashboard
 - 📥 **Exportar datos** - CSV para Excel/Google Sheets
 - 🔍 **Filtros avanzados** - Por columna y búsqueda de texto
 
-#### **Explorador de Archivos Avanzado:**
+#### **Explorador de Archivos Avanzado (2 pestañas):**
+
+**📄 Lista de Archivos:**
 - 🔍 **Filtros múltiples:**
   - **Origen:** Procesados / RAW / Todos los buckets
   - **Tipo:** Todos / parquet / jsonl / csv / json / txt / metadata
   - **Fecha:** Filtro opcional por día específico
 - 📄 **Tabla optimizada:**
   - Numeración automática (#)
-  - Columnas: Archivo, Tipo, Tamaño, Fecha
+  - Columnas: Archivo, Tipo, Tamaño, Fecha, Legible (✅/❌)
   - Paginación inteligente (20 archivos por página)
   - Selector de página en esquina inferior derecha
+- 📖 **Lector de archivos integrado:**
+  - Selector con paginación (10 archivos por página)
+  - Origen configurable: Solo Procesados / Todos los archivos
+  - Botones: Leer Archivo / Descargar
+  - Análisis completo con métricas (Filas, Columnas, RAM)
+  - Vista previa de datos (primeras 10 filas)
+  - Exportar a CSV
+
+**📬 Mensajes SQS:**
+- 📊 **Estado de la cola en tiempo real:**
+  - Mensajes disponibles
+  - Mensajes en procesamiento
+  - Mensajes retrasados
+- 💡 **Explicaciones inteligentes:**
+  - Diferencia entre "disponibles" y "en procesamiento"
+  - Información sobre visibility timeout
+- 🤖 **Estado del worker:**
+  - Detecta si está corriendo
+  - Muestra comando para iniciarlo si está detenido
+- 📋 **Mensajes detallados:**
+  - Expandibles con ID, fecha de envío, contenido
+  - Soporte para mensajes JSON de S3
+  - Información de archivos procesados
+  - Opción de ver JSON completo
 
 ### 🎮 **Cómo usar el Dashboard:**
 
 1. **Monitoreo general:** Las 6 métricas te dan una vista rápida del sistema
 2. **Análisis detallado:** Las 3 gráficas muestran distribuciones y eficiencia
 3. **Verificar worker:** La sección Worker Status te dice si está corriendo
-4. **Explorar archivos:** Usa los filtros para encontrar archivos específicos
-5. **Leer archivos:** Selecciona cualquier archivo y usa "Leer Archivo" para análisis completo
-6. **Descargar archivos:** Botón "Descargar" para cualquier tipo de archivo
-7. **Exportar datos:** Usa "Exportar CSV" para abrir en Excel/Google Sheets
-8. **Navegación:** Usa el selector de página para ver más archivos
+4. **Pestaña Lista de Archivos:**
+   - Usa los filtros para encontrar archivos específicos
+   - Navega con el selector de página
+   - Usa el lector integrado para analizar archivos
+   - Descarga archivos directamente
+5. **Pestaña Mensajes SQS:**
+   - Monitorea el estado de la cola en tiempo real
+   - Ve mensajes detallados si los hay
+   - Verifica si el worker está procesando
+6. **Lector de archivos (en Lista de Archivos):**
+   - Selecciona origen: Solo Procesados / Todos los archivos
+   - Navega por páginas si hay muchos archivos
+   - Usa "Leer Archivo" para análisis completo
+   - Usa "Descargar" para cualquier tipo de archivo
+   - Exporta a CSV para Excel/Google Sheets
 
 ### ⚙️ **Configuración:**
 - **Auto-refresh:** Desactivado por defecto (activa manualmente si quieres)
 - **Cache:** 30 segundos para mejor rendimiento
 - **Acceso:** http://localhost:8501
+- **Pestañas:** Lista de Archivos (con lector integrado) + Mensajes SQS
+- **Paginación:** 20 archivos por página en tabla, 10 en lector
 
 ---
 
@@ -261,6 +299,19 @@ SELECT action, COUNT(*) as total
 FROM year_2026 
 GROUP BY action;
 ```
+
+### Consultar mensajes SQS desde terminal (¡NUEVO!)
+```bash
+# Ver estado básico de la cola
+python main.py sqs-messages
+
+# Ver hasta 20 mensajes
+python main.py sqs-messages --max-messages 20
+
+# Ver mensajes con detalles completos
+python main.py sqs-messages --details
+```
+Monitorea el estado de la cola SQS y ve mensajes detallados desde la terminal.
 
 ### Leer archivos desde terminal (¡NUEVO!)
 ```bash
@@ -517,8 +568,8 @@ python main.py athena
 # Athena Interactivo (¡NUEVO!)
 python main.py athena-sql
 
-# Leer archivos desde terminal
-python main.py read
+# Consultar mensajes SQS desde terminal
+python main.py sqs-messages
 
 # Ver archivos S3 (básico)
 python main.py s3-sync --bucket tu-bucket
@@ -554,14 +605,16 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 ### ✅ COMPLETAMENTE IMPLEMENTADO
 - ✅ Dashboard web interactivo con 6 métricas en tiempo real
 - ✅ Análisis avanzado con 3 gráficas interactivas
-- ✅ Explorador de archivos con filtros múltiples (tipo, fecha, origen)
-- ✅ Lector de archivos integrado en dashboard (5 pestañas completas)
+- ✅ **Explorador de archivos con 2 pestañas:** Lista de Archivos + Mensajes SQS
+- ✅ **Lector de archivos integrado en dashboard** con paginación y selección de origen
+- ✅ **Monitor de mensajes SQS en tiempo real** con explicaciones inteligentes
+- ✅ **Estado del worker en dashboard** con detección automática
+- ✅ Filtros múltiples (tipo, fecha, origen) con paginación inteligente
 - ✅ Lector de archivos interactivo por terminal
 - ✅ Descarga de archivos desde dashboard
 - ✅ Soporte completo para todos los tipos de archivo (parquet, json, csv, txt, metadata)
 - ✅ Análisis completo de datos con estadísticas y gráficas
 - ✅ Manejo robusto de codificaciones y archivos binarios
-- ✅ Paginación inteligente y numeración
 - ✅ Worker status en tiempo real con detección de PID
 - ✅ Monitor de sistema integrado
 - ✅ Comandos CLI simplificados y unificados
@@ -569,6 +622,8 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 - ✅ **Athena Interactivo** - Console SQL con consultas multilínea
 - ✅ **Comandos especiales** - `tables`, `schema`, navegación intuitiva
 - ✅ **Análisis en tiempo real** - Resultados SQL inmediatos
+- ✅ **Mensajes SQS detallados** - Visualización completa del estado de la cola
+- ✅ **Explicaciones contextuales** - Diferencia entre mensajes disponibles vs en procesamiento
 
 ### 🚧 Próximas mejoras sugeridas
 - Validación de esquema de datos automática
@@ -585,6 +640,7 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 
 ### 📱 Accesos rápidos
 - **Dashboard**: `python main.py dashboard` → http://localhost:8501
+- **Mensajes SQS**: `python main.py sqs-messages`
 - **Lector de archivos**: `python main.py read`
 - **Worker**: `python main.py worker`
 - **Pipeline**: `python main.py pipeline`

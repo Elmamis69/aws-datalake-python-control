@@ -138,7 +138,7 @@ def count_files_today(aws_conf):
     """Contar archivos procesados hoy"""
     try:
         import boto3
-        from datetime import date, datetime
+        from datetime import date
         
         s3 = boto3.client('s3')
         response = s3.list_objects_v2(
@@ -153,14 +153,11 @@ def count_files_today(aws_conf):
         count = 0
         
         for obj in response['Contents']:
-            # Usar UTC para comparar fechas
-            obj_date = obj['LastModified'].date()
-            if obj_date == today:
+            if obj['LastModified'].date() == today:
                 count += 1
         
         return count
-    except Exception as e:
-        print(f"Error contando archivos de hoy: {e}")
+    except Exception:
         return 0
 
 def get_file_type_stats(aws_conf):
@@ -372,17 +369,13 @@ def get_sqs_messages_for_dashboard(queue_url, max_messages=10):
         return {
             'messages': messages,
             'queue_attributes': queue_attrs,
-            'total_messages': queue_attrs.get('messages_available', 0),
-            'messages_in_flight': queue_attrs.get('messages_in_flight', 0),
-            'messages_delayed': queue_attrs.get('messages_delayed', 0)
+            'total_messages': queue_attrs.get('messages_available', 0)
         }
     except Exception as e:
         return {
             'messages': [],
             'queue_attributes': {},
             'total_messages': 0,
-            'messages_in_flight': 0,
-            'messages_delayed': 0,
             'error': str(e)
         }
 
@@ -442,9 +435,9 @@ def main():
     
     with col4:
         st.metric(
-            label="🔥 Procesados Hoy",
+            label="🔥 Hoy",
             value=metrics['today_files'],
-            delta="Archivos de hoy"
+            delta="Procesados"
         )
     
     with col5:
@@ -740,173 +733,159 @@ def main():
                         st.rerun()
         else:
             st.info("🔍 No se encontraron archivos con los filtros seleccionados")
+    
+    # Controles de filtro avanzados
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+    
+    with col1:
+        # Selector de origen
+        source_options = {
+            'processed': 'Procesados',
+            'raw': 'RAW',
+            'all': 'Todos los buckets'
+        }
+        selected_source = st.selectbox(
+            "Origen:",
+            options=list(source_options.keys()),
+            format_func=lambda x: source_options[x],
+            index=0
+        )
+    
+    with col2:
+        # Selector de tipo de archivo
+        available_types = ['Todos', 'parquet', 'jsonl', 'csv', 'json', 'txt', 'metadata']
+        selected_type = st.selectbox(
+            "Tipo de archivo:",
+            options=available_types,
+            index=0
+        )
+    
+    with col3:
+        # Selector de fecha
+        from datetime import date, timedelta
         
-        # Lector de archivos dentro de la pestaña
-        st.markdown("---")
-        st.subheader("📖 Lector de Archivos")
-        
-        # Controles para el lector
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            reader_source = st.selectbox(
-                "Origen para lector:",
-                options=['processed', 'all'],
-                format_func=lambda x: 'Solo Procesados' if x == 'processed' else 'Todos los archivos',
-                index=1,  # Por defecto 'all'
-                key='reader_source'
+        use_date_filter = st.checkbox("Filtrar por fecha")
+        if use_date_filter:
+            selected_date = st.date_input(
+                "Fecha:",
+                value=date.today(),
+                max_value=date.today(),
+                min_value=date.today() - timedelta(days=30)
             )
-        
-        # Obtener archivos para el lector
-        reader_files = get_files_advanced_filter(metrics['aws_conf'], None, None, reader_source)
-        
-        # Selector de archivo para leer
-        if reader_files:
-            # Configuración de paginación para el lector (reducir a 10 por página)
-            reader_items_per_page = 10
-            reader_total_pages = (len(reader_files) + reader_items_per_page - 1) // reader_items_per_page
-            
-            # Página actual del lector
-            reader_current_page = st.session_state.get('reader_page', 1)
-            reader_start_idx = (reader_current_page - 1) * reader_items_per_page
-            reader_end_idx = reader_start_idx + reader_items_per_page
-            reader_display_files = reader_files[reader_start_idx:reader_end_idx]
-            
-            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-            
-            with col1:
-                # Crear opciones para el selectbox (solo archivos de la página actual)
-                file_options = {}
-                for i, file_info in enumerate(reader_display_files):
-                    display_name = f"{reader_start_idx + i + 1:2d}. {file_info['nombre']} ({file_info['tipo'].upper()}, {file_info['tamaño']})"
-                    file_options[display_name] = file_info
-                
-                selected_file_display = st.selectbox(
-                    f"Selecciona un archivo ({len(reader_files)} disponibles):",
-                    options=list(file_options.keys()),
-                    index=0 if file_options else None
-                )
-            
-            with col2:
-                # Selector de página para el lector (siempre mostrar si hay más de 1 página)
-                if reader_total_pages > 1:
-                    new_reader_page = st.selectbox(
-                        f"Página:",
-                        options=list(range(1, reader_total_pages + 1)),
-                        index=reader_current_page - 1,
-                        format_func=lambda x: f"{x}/{reader_total_pages}",
-                        key='reader_page_selector'
-                    )
-                    if new_reader_page != reader_current_page:
-                        st.session_state.reader_page = new_reader_page
-                        st.rerun()
-                else:
-                    st.write("")  # Espacio vacío
-            
-            with col3:
-                # Botón para leer (solo archivos compatibles)
-                if selected_file_display:
-                    selected_file = file_options[selected_file_display]
-                    is_readable = selected_file['tipo'] in ['parquet', 'json', 'jsonl', 'csv']
-                    
-                    read_button = st.button(
-                        "📖 Leer Archivo", 
-                        type="primary",
-                        disabled=not is_readable,
-                        help="Solo archivos parquet, json, jsonl, csv" if not is_readable else "Leer y analizar archivo"
-                    )
-            
-            with col4:
-                # Botón para descargar (todos los archivos)
-                if selected_file_display:
-                    download_button = st.button(
-                        "⬇️ Descargar", 
-                        type="secondary",
-                        help="Descargar archivo completo"
-                    )
-            
-            # Información de paginación del lector
-            if reader_total_pages > 1:
-                st.info(f"Mostrando archivos {reader_start_idx + 1}-{min(reader_end_idx, len(reader_files))} de {len(reader_files)} (Página {reader_current_page} de {reader_total_pages})")
-            
-            # Mostrar información del archivo seleccionado
-            if selected_file_display:
-                selected_file = file_options[selected_file_display]
-                
-                # Info del archivo
-                st.info(f"📁 **Archivo:** {selected_file['nombre']} | **Tipo:** {selected_file['tipo'].upper()} | **Tamaño:** {selected_file['tamaño']} | **Fecha:** {selected_file['fecha']}")
-                
-                # Descargar archivo
-                if download_button:
-                    with st.spinner(f"Descargando {selected_file['nombre']}..."):
-                        file_content, error = download_file_from_s3(
-                            selected_file['bucket'],
-                            selected_file['ruta']
-                        )
-                    
-                    if error:
-                        st.error(f"❌ {error}")
-                    else:
-                        st.success(f"✅ Archivo descargado: **{selected_file['nombre']}**")
-                        
-                        # Botón de descarga
-                        st.download_button(
-                            label="💾 Guardar archivo",
-                            data=file_content,
-                            file_name=selected_file['nombre'],
-                            mime="application/octet-stream"
-                        )
-                
-                # Leer archivo (solo si es compatible)
-                if read_button and is_readable:
-                    with st.spinner(f"Leyendo {selected_file['nombre']}..."):
-                        df, error = read_file_from_s3(
-                            selected_file['bucket'],
-                            selected_file['ruta'],
-                            selected_file['tipo']
-                        )
-                    
-                    if error:
-                        st.error(f"❌ {error}")
-                    else:
-                        st.success(f"✅ Archivo leído exitosamente: **{selected_file['nombre']}**")
-                        
-                        # Información del DataFrame
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("📊 Filas", f"{df.shape[0]:,}")
-                        with col2:
-                            st.metric("📋 Columnas", df.shape[1])
-                        with col3:
-                            memory_bytes = df.memory_usage(deep=True).sum()
-                            if memory_bytes < 1024:
-                                memory_str = f"{memory_bytes} B"
-                            elif memory_bytes < 1024 * 1024:
-                                memory_str = f"{memory_bytes / 1024:.1f} KB"
-                            else:
-                                memory_str = f"{memory_bytes / 1024 / 1024:.1f} MB"
-                            st.metric("💾 RAM", memory_str, help="Memoria usada por los datos en RAM")
-                        with col4:
-                            # Botón para exportar como CSV
-                            csv_data = df.to_csv(index=False)
-                            st.download_button(
-                                "🔗 Exportar CSV",
-                                data=csv_data,
-                                file_name=f"{selected_file['nombre'].split('.')[0]}_export.csv",
-                                mime="text/csv",
-                                help="Descargar como CSV para abrir en Excel/Google Sheets"
-                            )
-                        
-                        # Vista previa del DataFrame
-                        st.write("**Vista previa (primeras 10 filas):**")
-                        st.dataframe(df.head(10), use_container_width=True)
         else:
-            st.info("No hay archivos disponibles para leer")
+            selected_date = None
+    
+    with col4:
+        # Botón de búsqueda y estadísticas
+        if st.button("🔍 Buscar archivos", type="primary"):
+            st.cache_data.clear()  # Limpiar cache para nueva búsqueda
+    
+    # Obtener archivos con filtros
+    config_path = os.path.join(os.path.dirname(__file__), '../config/settings.yaml')
+    config = load_config(config_path)
+    aws_conf = config['aws']
+    
+    filtered_files = get_files_advanced_filter(
+        aws_conf, 
+        selected_date, 
+        selected_type.lower() if selected_type.lower() != 'todos' else None,
+        selected_source
+    )
+    
+    # Mostrar resultados con paginación
+    if filtered_files:
+        # Estadísticas de la búsqueda
+        st.success(f"📁 **{len(filtered_files)} archivos encontrados**")
+        
+        # Configuración de paginación
+        items_per_page = 20
+        total_pages = (len(filtered_files) + items_per_page - 1) // items_per_page
+        
+        # Calcular archivos para la página actual
+        current_page = st.session_state.get('page', 1)
+        start_idx = (current_page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        display_files = filtered_files[start_idx:end_idx]
+        
+        # Información de paginación
+        if total_pages > 1:
+            st.info(f"Mostrando archivos {start_idx + 1}-{min(end_idx, len(filtered_files))} de {len(filtered_files)} (Página {current_page} de {total_pages})")
+        
+        # Agregar numeración a los archivos
+        for i, file_info in enumerate(display_files):
+            file_info['#'] = start_idx + i + 1
+        
+        # Crear DataFrame con numeración (sin mostrar bucket y ruta)
+        df_filtered = pd.DataFrame(display_files)
+        
+        # Reordenar columnas para poner # al principio (sin bucket y ruta para la vista)
+        columns_order = ['#', 'nombre', 'tipo', 'tamaño', 'fecha']
+        df_display = df_filtered[columns_order]
+        
+        # Agregar indicador de archivos legibles
+        df_display['📖'] = ['✅' if f['tipo'] in ['parquet', 'json', 'jsonl', 'csv'] else '❌' for f in display_files]
+        
+        # Mostrar tabla
+        st.dataframe(
+            df_display,
+            column_config={
+                "#": st.column_config.NumberColumn(
+                    "#",
+                    help="Número de archivo",
+                    width=60
+                ),
+                "nombre": st.column_config.TextColumn(
+                    "Archivo",
+                    help="Nombre del archivo",
+                    width=None
+                ),
+                "tipo": st.column_config.TextColumn(
+                    "Tipo",
+                    help="Extensión del archivo",
+                    width=80
+                ),
+                "tamaño": st.column_config.TextColumn(
+                    "Tamaño",
+                    help="Tamaño del archivo",
+                    width=80
+                ),
+                "fecha": st.column_config.TextColumn(
+                    "Fecha",
+                    help="Fecha de creación/modificación",
+                    width=150
+                ),
+                "📖": st.column_config.TextColumn(
+                    "Legible",
+                    help="✅ = Se puede leer y analizar, ❌ = Solo descarga",
+                    width=70
+                )
+            },
+            hide_index=True,
+            width="stretch"
+        )
+        
+        # Selector de página abajo a la derecha
+        if total_pages > 1:
+            col1, col2 = st.columns([3, 1])
+            with col2:
+                # Selector de página
+                new_page = st.selectbox(
+                    f"Página ({current_page} de {total_pages}):",
+                    options=list(range(1, total_pages + 1)),
+                    index=current_page - 1,
+                    key='page_selector_bottom'
+                )
+                if new_page != current_page:
+                    st.session_state.page = new_page
+                    st.rerun()
+    else:
+        st.info("🔍 No se encontraron archivos con los filtros seleccionados")
     
     with tab2:
         st.subheader("📬 Mensajes SQS")
         
         # Obtener mensajes SQS detallados
-        sqs_data = get_sqs_messages_for_dashboard(metrics['aws_conf']['sqs_queue_url'], max_messages=20)
+        sqs_data = get_sqs_messages_for_dashboard(aws_conf['sqs_queue_url'], max_messages=20)
         
         if 'error' in sqs_data:
             st.error(f"❌ Error obteniendo mensajes SQS: {sqs_data['error']}")
@@ -918,38 +897,27 @@ def main():
             # Estado de la cola
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("📬 Disponibles", sqs_data['total_messages'])
+                st.metric("📬 Disponibles", total_messages)
             with col2:
-                st.metric("⏳ En procesamiento", sqs_data['messages_in_flight'])
+                st.metric("⏳ En procesamiento", queue_attrs.get('messages_in_flight', 0))
             with col3:
-                st.metric("⏰ Retrasados", sqs_data['messages_delayed'])
+                st.metric("⏰ Retrasados", queue_attrs.get('messages_delayed', 0))
             
-            # Explicar el estado si hay mensajes en procesamiento
-            if sqs_data['messages_in_flight'] > 0:
-                st.info(f"💡 Los {sqs_data['messages_in_flight']} mensajes en procesamiento están siendo procesados por otro consumidor o están en período de visibility timeout")
-            
-            if sqs_data['total_messages'] == 0 and sqs_data['messages_in_flight'] == 0:
+            if total_messages == 0:
                 st.success("✅ **No hay mensajes en cola**")
                 st.info("📬 La cola SQS está vacía - No hay archivos pendientes de procesar")
-            elif sqs_data['total_messages'] == 0 and sqs_data['messages_in_flight'] > 0:
-                st.warning(f"⏳ **No hay mensajes disponibles para leer**")
-                st.info(f"Hay {sqs_data['messages_in_flight']} mensajes siendo procesados")
             else:
-                st.warning(f"⚠️ **{sqs_data['total_messages']} mensajes en cola**")
+                st.warning(f"⚠️ **{total_messages} mensajes en cola**")
                 
                 # Mostrar estado del worker
                 worker = metrics['worker_status']
                 if worker['running']:
                     st.success(f"🤖 Worker activo - Procesando mensajes ({worker['since']})")
-                elif sqs_data['total_messages'] > 0 or sqs_data['messages_in_flight'] > 0:
+                else:
                     st.error("🛑 Worker detenido - Los mensajes no se procesarán")
                     st.code("python main.py worker")
-                else:
-                    st.info("🔄 Los mensajes pueden estar siendo procesados por el worker")
                 
                 # Mostrar mensajes detallados
-                messages = sqs_data['messages']
-                total_messages = sqs_data['total_messages']
                 if messages:
                     st.markdown("---")
                     st.write(f"📋 **Mensajes en Cola ({len(messages)} de {total_messages}):**")
@@ -994,10 +962,310 @@ def main():
                     
                     if len(messages) < total_messages:
                         st.info(f"💡 Hay {total_messages - len(messages)} mensajes más en cola")
-                elif sqs_data['total_messages'] == 0 and sqs_data['messages_in_flight'] > 0:
-                    st.info("🔄 Los mensajes están siendo procesados y no son visibles temporalmente")
-                elif sqs_data['total_messages'] > 0:
+                else:
                     st.info("🔄 Los mensajes pueden estar siendo procesados por el worker")
+    
+    # Lector de archivos
+    st.markdown("---")
+    st.subheader("📖 Lector de Archivos")
+    
+    # Selector de archivo para leer - TODOS los archivos
+    if filtered_files:
+        col1, col2, col3 = st.columns([3, 1, 1])
+        
+        with col1:
+            # Crear opciones para el selectbox - TODOS los archivos (sin límite)
+            file_options = {}
+            for i, file_info in enumerate(filtered_files):  # Sin límite de 50
+                display_name = f"{i+1:2d}. {file_info['nombre']} ({file_info['tipo'].upper()}, {file_info['tamaño']})"
+                file_options[display_name] = file_info
+            
+            selected_file_display = st.selectbox(
+                f"Selecciona un archivo ({len(filtered_files)} disponibles):",
+                options=list(file_options.keys()),
+                index=0 if file_options else None
+            )
+        
+        with col2:
+            # Botón para leer (solo archivos compatibles)
+            if selected_file_display:
+                selected_file = file_options[selected_file_display]
+                is_readable = selected_file['tipo'] in ['parquet', 'json', 'jsonl', 'csv']
+                
+                read_button = st.button(
+                    "📖 Leer Archivo", 
+                    type="primary",
+                    disabled=not is_readable,
+                    help="Solo archivos parquet, json, jsonl, csv" if not is_readable else "Leer y analizar archivo"
+                )
+        
+        with col3:
+            # Botón para descargar (todos los archivos)
+            if selected_file_display:
+                download_button = st.button(
+                    "⬇️ Descargar", 
+                    type="secondary",
+                    help="Descargar archivo completo"
+                )
+        
+        # Mostrar información del archivo seleccionado
+        if selected_file_display:
+            selected_file = file_options[selected_file_display]
+            
+            # Info del archivo
+            st.info(f"📁 **Archivo:** {selected_file['nombre']} | **Tipo:** {selected_file['tipo'].upper()} | **Tamaño:** {selected_file['tamaño']} | **Fecha:** {selected_file['fecha']}")
+            
+            # Descargar archivo
+            if download_button:
+                with st.spinner(f"Descargando {selected_file['nombre']}..."):
+                    file_content, error = download_file_from_s3(
+                        selected_file['bucket'],
+                        selected_file['ruta']
+                    )
+                
+                if error:
+                    st.error(f"❌ {error}")
+                else:
+                    st.success(f"✅ Archivo descargado: **{selected_file['nombre']}**")
+                    
+                    # Botón de descarga
+                    st.download_button(
+                        label="💾 Guardar archivo",
+                        data=file_content,
+                        file_name=selected_file['nombre'],
+                        mime="application/octet-stream"
+                    )
+            
+            # Leer archivo (solo si es compatible)
+            if read_button and is_readable:
+                with st.spinner(f"Leyendo {selected_file['nombre']}..."):
+                    df, error = read_file_from_s3(
+                        selected_file['bucket'],
+                        selected_file['ruta'],
+                        selected_file['tipo']
+                    )
+                
+                if error:
+                    st.error(f"❌ {error}")
+                else:
+                    st.success(f"✅ Archivo leído exitosamente: **{selected_file['nombre']}**")
+                    
+                    # Información del DataFrame
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("📊 Filas", f"{df.shape[0]:,}")
+                    with col2:
+                        st.metric("📋 Columnas", df.shape[1])
+                    with col3:
+                        memory_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
+                        st.metric("💾 Memoria", f"{memory_mb:.1f} MB")
+                    with col4:
+                        # Botón para abrir en nueva pestaña (exportar como CSV)
+                        csv_data = df.to_csv(index=False)
+                        st.download_button(
+                            "🔗 Exportar CSV",
+                            data=csv_data,
+                            file_name=f"{selected_file['nombre'].split('.')[0]}_export.csv",
+                            mime="text/csv",
+                            help="Descargar como CSV para abrir en Excel/Google Sheets"
+                        )
+                    
+                    # Tabs para diferentes vistas
+                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔍 Vista Previa", "📊 Estadísticas", "🏷️ Tipos de Datos", "📈 Gráficas", "🔍 Explorar"])
+                    
+                    with tab1:
+                        # Controles de vista previa
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            show_rows = st.slider("Filas a mostrar:", 5, min(100, len(df)), 10)
+                        with col2:
+                            view_mode = st.radio("Vista:", ["Primeras filas", "Últimas filas", "Muestra aleatoria"], horizontal=True)
+                        
+                        if view_mode == "Primeras filas":
+                            st.write(f"**Primeras {show_rows} filas:**")
+                            st.dataframe(df.head(show_rows), use_container_width=True)
+                        elif view_mode == "Últimas filas":
+                            st.write(f"**Últimas {show_rows} filas:**")
+                            st.dataframe(df.tail(show_rows), use_container_width=True)
+                        else:
+                            st.write(f"**Muestra aleatoria de {show_rows} filas:**")
+                            st.dataframe(df.sample(min(show_rows, len(df))), use_container_width=True)
+                    
+                    with tab2:
+                        # Estadísticas básicas
+                        numeric_cols = df.select_dtypes(include=['number']).columns
+                        if len(numeric_cols) > 0:
+                            st.write("**Estadísticas de columnas numéricas:**")
+                            st.dataframe(df[numeric_cols].describe(), use_container_width=True)
+                        
+                        # Información general
+                        st.write("**Resumen por columna:**")
+                        info_data = {
+                            'Columna': df.columns,
+                            'Tipo': [str(dtype) for dtype in df.dtypes],
+                            'No Nulos': [f"{df[col].count():,}" for col in df.columns],
+                            'Nulos': [f"{df[col].isnull().sum():,}" for col in df.columns],
+                            '% Nulos': [f"{(df[col].isnull().sum() / len(df) * 100):.1f}%" for col in df.columns],
+                            'Únicos': [f"{df[col].nunique():,}" for col in df.columns]
+                        }
+                        info_df = pd.DataFrame(info_data)
+                        st.dataframe(info_df, use_container_width=True)
+                    
+                    with tab3:
+                        st.write("**Análisis detallado por columna:**")
+                        
+                        # Selector de columna
+                        selected_col = st.selectbox("Selecciona una columna:", df.columns)
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Información de '{selected_col}':**")
+                            col_info = {
+                                'Tipo de dato': str(df[selected_col].dtype),
+                                'Valores totales': f"{len(df):,}",
+                                'Valores únicos': f"{df[selected_col].nunique():,}",
+                                'Valores nulos': f"{df[selected_col].isnull().sum():,}",
+                                'Porcentaje nulos': f"{(df[selected_col].isnull().sum() / len(df) * 100):.2f}%"
+                            }
+                            
+                            for key, value in col_info.items():
+                                st.write(f"- **{key}:** {value}")
+                        
+                        with col2:
+                            st.write(f"**Valores más frecuentes en '{selected_col}':**")
+                            if df[selected_col].nunique() <= 50:
+                                value_counts = df[selected_col].value_counts().head(10)
+                                st.dataframe(value_counts.to_frame('Frecuencia'), use_container_width=True)
+                            else:
+                                st.info("Demasiados valores únicos para mostrar frecuencias")
+                    
+                    with tab4:
+                        # Gráficas automáticas mejoradas
+                        numeric_cols = df.select_dtypes(include=['number']).columns
+                        
+                        if len(numeric_cols) > 0:
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # Selector de columna numérica
+                                selected_numeric = st.selectbox("Columna numérica:", numeric_cols)
+                                
+                                # Histograma
+                                st.write(f"**Distribución de {selected_numeric}:**")
+                                fig_hist = px.histogram(df, x=selected_numeric, nbins=30)
+                                fig_hist.update_layout(height=400)
+                                st.plotly_chart(fig_hist, use_container_width=True)
+                            
+                            with col2:
+                                if len(numeric_cols) > 1:
+                                    # Box plot
+                                    st.write(f"**Box Plot de {selected_numeric}:**")
+                                    fig_box = px.box(df, y=selected_numeric)
+                                    fig_box.update_layout(height=400)
+                                    st.plotly_chart(fig_box, use_container_width=True)
+                            
+                            # Matriz de correlación si hay múltiples columnas
+                            if len(numeric_cols) > 1:
+                                st.write("**Matriz de correlación:**")
+                                corr_matrix = df[numeric_cols].corr()
+                                fig_corr = px.imshow(corr_matrix, 
+                                                   text_auto=True, 
+                                                   aspect="auto",
+                                                   color_continuous_scale='RdBu')
+                                fig_corr.update_layout(height=500)
+                                st.plotly_chart(fig_corr, use_container_width=True)
+                        
+                        # Gráficas categóricas
+                        categorical_cols = df.select_dtypes(include=['object', 'string']).columns
+                        if len(categorical_cols) > 0:
+                            selected_cat = st.selectbox("Columna categórica:", categorical_cols)
+                            
+                            if df[selected_cat].nunique() <= 20:
+                                st.write(f"**Conteo de valores en {selected_cat}:**")
+                                value_counts = df[selected_cat].value_counts().head(15)
+                                fig_bar = px.bar(x=value_counts.values, y=value_counts.index, orientation='h')
+                                fig_bar.update_layout(height=400)
+                                st.plotly_chart(fig_bar, use_container_width=True)
+                    
+                    with tab5:
+                        st.write("**🔍 Explorador de datos avanzado:**")
+                        
+                        # Filtros dinámicos
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Filtro por columna
+                            filter_col = st.selectbox("Filtrar por columna:", ['Ninguno'] + list(df.columns))
+                            
+                            if filter_col != 'Ninguno':
+                                unique_values = df[filter_col].dropna().unique()
+                                if len(unique_values) <= 50:
+                                    selected_values = st.multiselect(
+                                        f"Valores de {filter_col}:",
+                                        options=unique_values,
+                                        default=unique_values[:5] if len(unique_values) > 5 else unique_values
+                                    )
+                                    
+                                    if selected_values:
+                                        filtered_df = df[df[filter_col].isin(selected_values)]
+                                    else:
+                                        filtered_df = df
+                                else:
+                                    st.info("Demasiados valores únicos para filtrar")
+                                    filtered_df = df
+                            else:
+                                filtered_df = df
+                        
+                        with col2:
+                            # Búsqueda de texto
+                            search_term = st.text_input("Buscar en todas las columnas:")
+                            
+                            if search_term:
+                                # Buscar en todas las columnas de texto
+                                text_cols = df.select_dtypes(include=['object', 'string']).columns
+                                mask = pd.Series([False] * len(filtered_df))
+                                
+                                for col in text_cols:
+                                    mask |= filtered_df[col].astype(str).str.contains(search_term, case=False, na=False)
+                                
+                                if mask.any():
+                                    filtered_df = filtered_df[mask]
+                                    st.success(f"Encontradas {len(filtered_df)} filas con '{search_term}'")
+                                else:
+                                    st.warning(f"No se encontraron resultados para '{search_term}'")
+                        
+                        # Mostrar datos filtrados
+                        if len(filtered_df) > 0:
+                            st.write(f"**Datos filtrados ({len(filtered_df):,} filas):**")
+                            
+                            # Paginación para datos filtrados
+                            rows_per_page = st.slider("Filas por página:", 10, 100, 25)
+                            total_pages = (len(filtered_df) + rows_per_page - 1) // rows_per_page
+                            
+                            if total_pages > 1:
+                                page = st.selectbox(f"Página (1-{total_pages}):", range(1, total_pages + 1))
+                                start_idx = (page - 1) * rows_per_page
+                                end_idx = start_idx + rows_per_page
+                                display_df = filtered_df.iloc[start_idx:end_idx]
+                            else:
+                                display_df = filtered_df
+                            
+                            st.dataframe(display_df, use_container_width=True)
+                            
+                            # Exportar datos filtrados
+                            if len(filtered_df) != len(df):
+                                csv_filtered = filtered_df.to_csv(index=False)
+                                st.download_button(
+                                    "📥 Exportar datos filtrados",
+                                    data=csv_filtered,
+                                    file_name=f"{selected_file['nombre'].split('.')[0]}_filtrado.csv",
+                                    mime="text/csv"
+                                )
+                        else:
+                            st.warning("No hay datos que mostrar con los filtros aplicados")
+    else:
+        st.info("Primero busca archivos para poder leerlos")
     
     # Errores recientes
     if metrics['errors']:

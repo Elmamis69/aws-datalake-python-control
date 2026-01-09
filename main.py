@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent / "src"))
 
 from src.datalake.sqs_worker import run_sqs_worker
+from src.datalake.sqs_reader import display_messages_terminal
 from src.datalake.s3_io import read_s3_object, write_parquet_to_s3
 from src.glue_catalog import GlueCatalogManager
 from src.athena_interactive import run_interactive_athena
@@ -170,16 +171,47 @@ def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: s
         if len(objects) > limit:
             logger.info(f"  ... y {len(objects) - limit} archivos más")
 
+def run_read_files(config: dict):
+    """Ejecutar lector de archivos interactivo"""
+    logger.info(" Iniciando lector de archivos...")
+    
+    # Ejecutar file_reader.py con el PYTHONPATH correcto
+    env = os.environ.copy()
+    env['PYTHONPATH'] = 'src'
+    
+    result = subprocess.run(
+        [sys.executable, 'scripts/file_reader.py'],
+        env=env,
+        cwd=Path(__file__).parent
+    )
+    
+    if result.returncode != 0:
+        logger.error(" Error ejecutando lector de archivos")
+        sys.exit(1)
+
+def run_sqs_messages(max_messages: int = 10, details: bool = False):
+    """Mostrar mensajes SQS en terminal"""
+    logger.info(" Consultando mensajes SQS...")
+    config = load_config()
+    
+    display_messages_terminal(
+        queue_url=config['aws']['sqs_queue_url'],
+        max_messages=max_messages,
+        details=details
+    )
+
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='AWS Data Lake Control')
-    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 'pipeline', 'dashboard', 'athena', 'athena-sql', 'read'], 
+    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 'pipeline', 'dashboard', 'athena', 'athena-sql', 'read', 'sqs-messages'], 
                        help='Comando a ejecutar')
     parser.add_argument('--bucket', help='Bucket S3 para sincronización')
     parser.add_argument('--prefix', default='', help='Prefijo S3')
     parser.add_argument('--limit', type=int, help='Número máximo de archivos a mostrar (default: todos)')
     parser.add_argument('--date', help='Filtrar por fecha (formato: YYYY-MM-DD, ej: 2026-01-08)')
     parser.add_argument('--latest', type=int, help='Mostrar los N archivos más recientes')
+    parser.add_argument('--max-messages', type=int, default=10, help='Número máximo de mensajes SQS a mostrar')
+    parser.add_argument('--details', action='store_true', help='Mostrar detalles completos de mensajes SQS')
     
     args = parser.parse_args()
     
@@ -202,6 +234,8 @@ def main():
         elif args.command == 'read':
             config = load_config()
             run_read_files(config)
+        elif args.command == 'sqs-messages':
+            run_sqs_messages(args.max_messages, args.details)
         elif args.command == 'dashboard':
             run_dashboard()
             
