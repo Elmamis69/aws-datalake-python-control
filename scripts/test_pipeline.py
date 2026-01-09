@@ -6,7 +6,7 @@
 import boto3
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Cargar configuración desde settings.yaml
 import yaml
@@ -23,8 +23,8 @@ region = aws_conf.get('region', 'us-east-2')
 
 # 1. Crear archivo JSONL de prueba
 data = [
-    {"event_time": datetime.utcnow().isoformat(), "user_id": 1, "action": "login"},
-    {"event_time": datetime.utcnow().isoformat(), "user_id": 2, "action": "logout"}
+    {"event_time": datetime.now(timezone.utc).isoformat(), "user_id": 1, "action": "login"},
+    {"event_time": datetime.now(timezone.utc).isoformat(), "user_id": 2, "action": "logout"}
 ]
 jsonl_path = "test.jsonl"
 with open(jsonl_path, 'w') as f:
@@ -32,7 +32,7 @@ with open(jsonl_path, 'w') as f:
         f.write(json.dumps(row) + '\n')
 
 # 2. Subir archivo a S3 RAW
-s3_key = f"{s3_raw_prefix}test_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.jsonl"
+s3_key = f"{s3_raw_prefix}test_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.jsonl"
 s3 = boto3.client('s3', region_name=region)
 s3.upload_file(jsonl_path, s3_raw_bucket, s3_key)
 print(f"Archivo subido a s3://{s3_raw_bucket}/{s3_key}")

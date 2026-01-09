@@ -169,6 +169,99 @@ python main.py athena
 ```
 Ejecuta consulta SQL de ejemplo sobre los datos.
 
+### 🔍 Athena Interactivo (¡NUEVO!)
+```bash
+python main.py athena-sql
+```
+Consola SQL interactiva para ejecutar consultas personalizadas en tiempo real.
+
+#### **Características del Athena Interactivo:**
+- **Consultas multilínea** - Escribe SQL complejo en múltiples líneas
+- **Comandos especiales:**
+  - `tables` - Ver todas las tablas disponibles
+  - `schema TABLA` - Ver columnas y tipos de una tabla
+  - `exit` - Salir del programa
+- **Resultados en tiempo real** - Ve los datos inmediatamente
+- **Formato tabla** - Resultados organizados y fáciles de leer
+
+#### **Cómo usar Athena Interactivo:**
+
+1. **Ejecutar comando:**
+   ```bash
+   python main.py athena-sql
+   ```
+
+2. **Ver tablas disponibles:**
+   ```sql
+   🔍 SQL> tables
+   📋 TABLAS DISPONIBLES:
+     • year_2025 (2 columnas) - s3://bucket/processed/events/year=2025/
+     • year_2026 (3 columnas) - s3://bucket/processed/events/year=2026/
+   ```
+
+3. **Ver esquema de tabla:**
+   ```sql
+   🔍 SQL> schema year_2026
+   📊 ESQUEMA DE TABLA: year_2026
+   --------------------------------------------------
+     event_time           | bigint
+     user_id              | bigint
+     action               | string
+   ```
+
+4. **Consultas de una línea:**
+   ```sql
+   🔍 SQL> SELECT COUNT(*) FROM year_2026;
+   ✅ Consulta exitosa! (2 filas)
+   📊 RESULTADOS:
+   ----------------
+   _col0
+   ----------------
+   16
+   ```
+
+5. **Consultas multilínea:**
+   ```sql
+   🔍 SQL> SELECT action, COUNT(*) as cantidad
+        ... FROM year_2026 
+        ... GROUP BY action
+        ... ORDER BY cantidad DESC;
+   ✅ Consulta exitosa! (3 filas)
+   📊 RESULTADOS:
+   ----------------
+   action    | cantidad
+   ----------------
+   login     | 8
+   logout    | 5
+   view      | 3
+   ```
+
+#### **Ejemplos de consultas útiles:**
+```sql
+-- Ver todos los datos
+SELECT * FROM year_2026 LIMIT 10;
+
+-- Análisis por usuario
+SELECT user_id, COUNT(*) as eventos
+FROM year_2026 
+GROUP BY user_id 
+ORDER BY eventos DESC;
+
+-- Convertir timestamp a fecha legible
+SELECT 
+    FROM_UNIXTIME(event_time/1000000000) as fecha,
+    user_id,
+    action
+FROM year_2026 
+ORDER BY event_time DESC 
+LIMIT 5;
+
+-- Actividad por tipo de acción
+SELECT action, COUNT(*) as total
+FROM year_2026 
+GROUP BY action;
+```
+
 ### Leer archivos desde terminal (¡NUEVO!)
 ```bash
 python main.py read
@@ -421,6 +514,9 @@ python main.py glue
 # Consultar con Athena
 python main.py athena
 
+# Athena Interactivo (¡NUEVO!)
+python main.py athena-sql
+
 # Leer archivos desde terminal
 python main.py read
 
@@ -455,29 +551,33 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 ---
 
 ## 11. 🚀 Extensiones y mejoras sugeridas
-### Implementadas ✅
-- ✅ Dashboard web interactivo con 6 métricas
+### ✅ COMPLETAMENTE IMPLEMENTADO
+- ✅ Dashboard web interactivo con 6 métricas en tiempo real
 - ✅ Análisis avanzado con 3 gráficas interactivas
-- ✅ Explorador de archivos con filtros múltiples
-- ✅ Lector de archivos integrado en dashboard (5 pestañas)
+- ✅ Explorador de archivos con filtros múltiples (tipo, fecha, origen)
+- ✅ Lector de archivos integrado en dashboard (5 pestañas completas)
 - ✅ Lector de archivos interactivo por terminal
 - ✅ Descarga de archivos desde dashboard
-- ✅ Soporte para todos los tipos de archivo (parquet, json, csv, txt, metadata)
+- ✅ Soporte completo para todos los tipos de archivo (parquet, json, csv, txt, metadata)
 - ✅ Análisis completo de datos con estadísticas y gráficas
 - ✅ Manejo robusto de codificaciones y archivos binarios
 - ✅ Paginación inteligente y numeración
-- ✅ Worker status en tiempo real
+- ✅ Worker status en tiempo real con detección de PID
 - ✅ Monitor de sistema integrado
-- ✅ Comandos CLI simplificados
+- ✅ Comandos CLI simplificados y unificados
 - ✅ Filtros S3 avanzados por fecha y tipo
+- ✅ **Athena Interactivo** - Console SQL con consultas multilínea
+- ✅ **Comandos especiales** - `tables`, `schema`, navegación intuitiva
+- ✅ **Análisis en tiempo real** - Resultados SQL inmediatos
 
-### Por implementar 🚧
-- Validación de esquema de datos
-- Manejo de errores avanzado y DLQ
-- Notificaciones por email/Slack
-- Automatización de Glue/Athena
+### 🚧 Próximas mejoras sugeridas
+- Validación de esquema de datos automática
+- Manejo de errores avanzado y Dead Letter Queue (DLQ)
+- Notificaciones por email/Slack cuando hay errores
+- Automatización completa de Glue/Athena
 - Historial de métricas en base de datos
-- Tests automatizados
+- Tests automatizados y CI/CD
+- Alertas proactivas de rendimiento
 
 ---
 
@@ -489,7 +589,8 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 - **Worker**: `python main.py worker`
 - **Pipeline**: `python main.py pipeline`
 - **Glue**: `python main.py glue`
-- **Athena**: `python main.py athena`
+- **Athena (ejemplo)**: `python main.py athena`
+- **🔍 Athena Interactivo**: `python main.py athena-sql`
 - **S3 (básico)**: `python main.py s3-sync --bucket tu-bucket`
 - **S3 (filtros)**: `python main.py s3-sync --bucket tu-bucket --latest 3`
 - **Verificar**: `python test_app.py`
