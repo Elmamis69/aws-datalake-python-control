@@ -10,6 +10,7 @@ import yaml
 import os
 from pathlib import Path
 from datetime import datetime
+import shutil  # Para detectar ancho de terminal
 
 def load_config():
     """Cargar configuración"""
@@ -18,10 +19,11 @@ def load_config():
         return yaml.safe_load(f)
 
 def list_all_files(config):
-    """Listar todos los archivos disponibles"""
+    """Listar todos los archivos disponibles (sin duplicados)"""
     s3 = boto3.client('s3', region_name=config['aws'].get('region', 'us-east-2'))
     
     all_files = []
+    seen_files = set()  # Para evitar duplicados
     
     # Buckets a revisar
     buckets_to_check = [
@@ -38,6 +40,15 @@ def list_all_files(config):
                 key = obj['Key']
                 size = obj['Size']
                 last_modified = obj['LastModified']
+                
+                # Crear identificador único basado en nombre y tamaño
+                file_id = f"{os.path.basename(key)}_{size}"
+                
+                # Saltar si ya vimos este archivo
+                if file_id in seen_files:
+                    continue
+                
+                seen_files.add(file_id)
                 
                 # Determinar tipo de archivo
                 if key.endswith('.parquet'):
@@ -149,9 +160,15 @@ def analyze_dataframe(df, filename):
     print(f"📁 Archivo: {filename}")
     print(f"📊 Dimensiones: {df.shape[0]:,} filas × {df.shape[1]} columnas")
     
-    # Memoria
-    memory_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
-    print(f"💾 Memoria: {memory_mb:.1f} MB")
+    # Memoria con formato mejorado
+    memory_bytes = df.memory_usage(deep=True).sum()
+    if memory_bytes < 1024:
+        memory_str = f"{memory_bytes} B"
+    elif memory_bytes < 1024 * 1024:
+        memory_str = f"{memory_bytes/1024:.1f} KB"
+    else:
+        memory_str = f"{memory_bytes/(1024*1024):.1f} MB"
+    print(f"💾 Memoria: {memory_str}")
     
     # Columnas
     print(f"📋 Columnas: {', '.join(df.columns.tolist())}")
@@ -183,7 +200,7 @@ def analyze_dataframe(df, filename):
 def run_file_reader():
     """Ejecutar lector de archivos interactivo"""
     print("🚀 LECTOR DE ARCHIVOS INTERACTIVO")
-    print("=" * 50)
+    print("=" * shutil.get_terminal_size().columns)
     
     # Cargar configuración
     config = load_config()
@@ -196,12 +213,39 @@ def run_file_reader():
         print("❌ No se encontraron archivos en los buckets configurados")
         return
     
+    # Detectar ancho de terminal
+    terminal_width = shutil.get_terminal_size().columns
+    
+    # Calcular anchos de columnas dinámicamente
+    num_col = 3      # "#"
+    tipo_col = 8     # "Tipo"
+    size_col = 8     # "Tamaño"
+    origen_col = 12  # "Origen"
+    
+    # El resto del espacio para archivo y ruta
+    remaining_width = terminal_width - num_col - tipo_col - size_col - origen_col - 6  # 6 espacios entre columnas
+    archivo_col = min(50, remaining_width // 2)  # Máximo 50 para archivo
+    ruta_col = remaining_width - archivo_col
+    
     print(f"\n📁 ARCHIVOS DISPONIBLES ({len(files)}):")
-    print(f"{'#':>3} {'Archivo':35} {'Tipo':8} {'Tamaño':10} {'Origen':15} {'Ruta Completa'}")
-    print("-" * 100)
+    print(f"{'#':>{num_col}} {'Archivo':{archivo_col}} {'Tipo':{tipo_col}} {'Tamaño':>{size_col}} {'Origen':{origen_col}} {'Ruta'}")
+    print("-" * terminal_width)
     
     for i, file_info in enumerate(files, 1):
-        print(f"{i:>3} {file_info['nombre']:35} {file_info['tipo']:8} {file_info['tamaño']:10} {file_info['origen']:15} {file_info['ruta_completa']}")
+        # Truncar nombre si es muy largo
+        nombre = file_info['nombre']
+        if len(nombre) > archivo_col - 1:
+            nombre = nombre[:archivo_col - 4] + "..."
+        
+        # Truncar ruta si es muy larga
+        ruta = file_info['ruta_completa']
+        if len(ruta) > ruta_col - 1:
+            if ruta_col > 10:
+                ruta = "..." + ruta[-(ruta_col - 4):]
+            else:
+                ruta = ruta[:ruta_col - 1]
+        
+        print(f"{i:>{num_col}} {nombre:{archivo_col}} {file_info['tipo']:{tipo_col}} {file_info['tamaño']:>{size_col}} {file_info['origen']:{origen_col}} {ruta}")
     
     # Selección de archivo
     while True:
