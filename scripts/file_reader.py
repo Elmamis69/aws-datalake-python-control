@@ -18,18 +18,27 @@ def load_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-def list_all_files(config):
+def list_all_files(config, filter_type="all"):
     """Listar todos los archivos disponibles (sin duplicados)"""
     s3 = boto3.client('s3', region_name=config['aws'].get('region', 'us-east-2'))
     
     all_files = []
     seen_files = set()  # Para evitar duplicados
     
-    # Buckets a revisar
-    buckets_to_check = [
-        (config['aws']['s3_raw_bucket'], 'RAW-Todos'),
-        (config['aws']['s3_processed_bucket'], 'Procesados')
-    ]
+    # Buckets a revisar según el filtro
+    if filter_type == "raw":
+        buckets_to_check = [
+            (config['aws']['s3_raw_bucket'], 'Raw')
+        ]
+    elif filter_type == "processed":
+        buckets_to_check = [
+            (config['aws']['s3_processed_bucket'], 'Procesados')
+        ]
+    else:  # "all"
+        buckets_to_check = [
+            (config['aws']['s3_raw_bucket'], 'Raw'),
+            (config['aws']['s3_processed_bucket'], 'Procesados')
+        ]
     
     for bucket_name, origen in buckets_to_check:
         try:
@@ -205,9 +214,39 @@ def run_file_reader():
     # Cargar configuración
     config = load_config()
     
+    # Selección de origen
+    print("📁 ORIGEN PARA LECTOR:")
+    print("1. Todos los archivos")
+    print("2. Solo Raw")
+    print("3. Solo Procesados")
+    
+    while True:
+        try:
+            choice = input("✨ Selecciona origen (1-3) o ENTER para todos: ").strip()
+            
+            if not choice or choice == "1":
+                filter_type = "all"
+                print("📂 Mostrando: Todos los archivos")
+                break
+            elif choice == "2":
+                filter_type = "raw"
+                print("📂 Mostrando: Solo archivos Raw")
+                break
+            elif choice == "3":
+                filter_type = "processed"
+                print("📂 Mostrando: Solo archivos Procesados")
+                break
+            else:
+                print("❌ Número inválido. Debe ser 1, 2 o 3")
+                
+        except KeyboardInterrupt:
+            print("
+👋 ¡Hasta luego!")
+            return
+    
     # Listar archivos
     print("📁 Cargando lista de archivos...")
-    files = list_all_files(config)
+    files = list_all_files(config, filter_type)
     
     if not files:
         print("❌ No se encontraron archivos en los buckets configurados")

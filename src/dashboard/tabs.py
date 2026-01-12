@@ -120,9 +120,9 @@ def render_files_tab(metrics):
     with col1:
         reader_source = st.selectbox(
             "Origen para lector:",
-            options=['processed', 'all'],
-            format_func=lambda x: 'Solo Procesados' if x == 'processed' else 'Todos los archivos',
-            index=1,
+            options=['processed', 'raw', 'all'],
+            format_func=lambda x: {'processed': 'Solo Procesados', 'raw': 'Solo Raw', 'all': 'Todos los archivos'}[x],
+            index=2,
             key='reader_source'
         )
     

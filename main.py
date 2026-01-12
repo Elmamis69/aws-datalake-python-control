@@ -171,6 +171,90 @@ def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: s
         if len(objects) > limit:
             logger.info(f"  ... y {len(objects) - limit} archivos más")
 
+def run_s3_delete(bucket: str, key: str = None, prefix: str = None, confirm: bool = False, interactive: bool = False):
+    """Eliminar archivos de S3"""
+    logger.info(f"🗑️ Eliminando archivos de S3: {bucket}")
+    s3 = boto3.client('s3')
+    
+    try:
+        if key:
+            # Eliminar archivo específico
+            if not confirm:
+                logger.warning(f"⚠️ ¿Eliminar archivo {key}? Use --confirm para proceder")
+                return
+            
+            s3.delete_object(Bucket=bucket, Key=key)
+            logger.info(f"✅ Archivo eliminado: {key}")
+            
+        elif prefix:
+            # Eliminar archivos por prefijo
+            response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+            objects = response.get('Contents', [])
+            
+            if not objects:
+                logger.info(f"📁 No se encontraron archivos con prefijo: {prefix}")
+                return
+            
+            # Ordenar por fecha (más recientes primero) para coincidir con dashboard
+            objects = sorted(objects, key=lambda x: x['LastModified'], reverse=True)
+            
+            if interactive:
+                # Modo interactivo: elegir archivo específico
+                logger.info(f"📋 Archivos encontrados ({len(objects)}):")
+                for i, obj in enumerate(objects, 1):
+                    date_str = obj['LastModified'].strftime('%Y-%m-%d %H:%M:%S')
+                    logger.info(f"  {i}. {obj['Key']} (subido: {date_str})")
+                
+                try:
+                    choice = input("\n🔢 Ingrese el número del archivo a eliminar (0 para cancelar): ")
+                    choice_num = int(choice)
+                    
+                    if choice_num == 0:
+                        logger.info("❌ Operación cancelada")
+                        return
+                    
+                    if 1 <= choice_num <= len(objects):
+                        selected_obj = objects[choice_num - 1]
+                        confirm_delete = input(f"\n⚠️ ¿Confirma eliminar '{selected_obj['Key']}'? (s/N): ")
+                        
+                        if confirm_delete.lower() in ['s', 'si', 'y', 'yes']:
+                            s3.delete_object(Bucket=bucket, Key=selected_obj['Key'])
+                            logger.info(f"✅ Archivo eliminado: {selected_obj['Key']}")
+                        else:
+                            logger.info("❌ Eliminación cancelada")
+                    else:
+                        logger.error(f"❌ Número inválido. Debe estar entre 1 y {len(objects)}")
+                        
+                except (ValueError, KeyboardInterrupt):
+                    logger.info("❌ Operación cancelada")
+                    return
+            
+            elif not confirm:
+                logger.warning(f"⚠️ ¿Eliminar {len(objects)} archivos con prefijo '{prefix}'? Use --confirm para proceder o --interactive para elegir uno")
+                for i, obj in enumerate(objects, 1):
+                    logger.info(f"  {i}. {obj['Key']}")
+                return
+            
+            else:
+                # Eliminar todos los archivos
+                delete_keys = [{'Key': obj['Key']} for obj in objects]
+                
+                # S3 permite máximo 1000 objetos por delete
+                for i in range(0, len(delete_keys), 1000):
+                    batch = delete_keys[i:i+1000]
+                    s3.delete_objects(
+                        Bucket=bucket,
+                        Delete={'Objects': batch}
+                    )
+                
+                logger.info(f"✅ {len(objects)} archivos eliminados con prefijo: {prefix}")
+        
+        else:
+            logger.error("❌ Debe especificar --key o --prefix")
+            
+    except Exception as e:
+        logger.error(f"❌ Error eliminando archivos: {e}")
+
 def run_read_files(config: dict):
     """Ejecutar lector de archivos interactivo"""
     logger.info(" Iniciando lector de archivos...")
@@ -203,15 +287,18 @@ def run_sqs_messages(max_messages: int = 10, details: bool = False):
 def main():
     """Función principal"""
     parser = argparse.ArgumentParser(description='AWS Data Lake Control')
-    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 'pipeline', 'dashboard', 'athena', 'athena-sql', 'read', 'sqs-messages'], 
+    parser.add_argument('command', choices=['worker', 'glue', 's3-sync', 's3-delete', 'pipeline', 'dashboard', 'athena', 'athena-sql', 'read', 'sqs-messages'], 
                        help='Comando a ejecutar')
     parser.add_argument('--bucket', help='Bucket S3 para sincronización')
     parser.add_argument('--prefix', default='', help='Prefijo S3')
+    parser.add_argument('--key', help='Archivo específico a eliminar')
+    parser.add_argument('--confirm', action='store_true', help='Confirmar eliminación de archivos')
     parser.add_argument('--limit', type=int, help='Número máximo de archivos a mostrar (default: todos)')
     parser.add_argument('--date', help='Filtrar por fecha (formato: YYYY-MM-DD, ej: 2026-01-08)')
     parser.add_argument('--latest', type=int, help='Mostrar los N archivos más recientes')
     parser.add_argument('--max-messages', type=int, default=10, help='Número máximo de mensajes SQS a mostrar')
     parser.add_argument('--details', action='store_true', help='Mostrar detalles completos de mensajes SQS')
+    parser.add_argument('--interactive', action='store_true', help='Modo interactivo para elegir archivo específico')
     
     args = parser.parse_args()
     
@@ -225,6 +312,11 @@ def main():
                 logger.error("--bucket es requerido para s3-sync")
                 sys.exit(1)
             run_s3_sync(args.bucket, args.prefix, args.limit, args.date, args.latest)
+        elif args.command == 's3-delete':
+            if not args.bucket:
+                logger.error("--bucket es requerido para s3-delete")
+                sys.exit(1)
+            run_s3_delete(args.bucket, args.key, args.prefix, args.confirm, args.interactive)
         elif args.command == 'pipeline':
             run_test_pipeline()
         elif args.command == 'athena':
