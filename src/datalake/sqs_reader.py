@@ -13,6 +13,7 @@ logger = logging.getLogger("sqs_reader")
 def get_sqs_messages(queue_url: str, max_messages: int = 10, session: Optional[boto3.Session] = None) -> List[Dict]:
     """
     Obtener mensajes de SQS sin eliminarlos de la cola
+    Hace múltiples consultas para obtener más mensajes
     
     Args:
         queue_url: URL de la cola SQS
@@ -24,44 +25,54 @@ def get_sqs_messages(queue_url: str, max_messages: int = 10, session: Optional[b
     """
     sqs = (session or boto3).client('sqs')
     
+    all_messages = []
+    attempts = 0
+    max_attempts = 5  # Máximo 5 intentos para obtener más mensajes
+    
     try:
-        response = sqs.receive_message(
-            QueueUrl=queue_url,
-            MaxNumberOfMessages=min(max_messages, 10),  # AWS límite es 10
-            WaitTimeSeconds=1,
-            AttributeNames=['All'],
-            MessageAttributeNames=['All']
-        )
-        
-        messages = response.get('Messages', [])
-        
-        # Formatear mensajes con metadata útil
-        formatted_messages = []
-        for msg in messages:
-            try:
-                # Intentar parsear el body como JSON
-                body = json.loads(msg['Body'])
-            except json.JSONDecodeError:
-                body = msg['Body']
+        while len(all_messages) < max_messages and attempts < max_attempts:
+            response = sqs.receive_message(
+                QueueUrl=queue_url,
+                MaxNumberOfMessages=min(10, max_messages - len(all_messages)),  # AWS límite es 10
+                WaitTimeSeconds=2,  # Esperar un poco más
+                AttributeNames=['All'],
+                MessageAttributeNames=['All']
+            )
             
-            # Obtener timestamp del mensaje
-            sent_timestamp = msg.get('Attributes', {}).get('SentTimestamp')
-            if sent_timestamp:
-                sent_time = datetime.fromtimestamp(int(sent_timestamp) / 1000)
-            else:
-                sent_time = None
+            messages = response.get('Messages', [])
             
-            formatted_msg = {
-                'message_id': msg['MessageId'],
-                'body': body,
-                'receipt_handle': msg['ReceiptHandle'],
-                'sent_time': sent_time,
-                'receive_count': int(msg.get('Attributes', {}).get('ApproximateReceiveCount', 0)),
-                'raw_body': msg['Body']
-            }
-            formatted_messages.append(formatted_msg)
+            if not messages:
+                # Si no hay mensajes, salir del loop
+                break
+            
+            # Formatear mensajes con metadata útil
+            for msg in messages:
+                try:
+                    # Intentar parsear el body como JSON
+                    body = json.loads(msg['Body'])
+                except json.JSONDecodeError:
+                    body = msg['Body']
+                
+                # Obtener timestamp del mensaje
+                sent_timestamp = msg.get('Attributes', {}).get('SentTimestamp')
+                if sent_timestamp:
+                    sent_time = datetime.fromtimestamp(int(sent_timestamp) / 1000)
+                else:
+                    sent_time = None
+                
+                formatted_msg = {
+                    'message_id': msg['MessageId'],
+                    'body': body,
+                    'receipt_handle': msg['ReceiptHandle'],
+                    'sent_time': sent_time,
+                    'receive_count': int(msg.get('Attributes', {}).get('ApproximateReceiveCount', 0)),
+                    'raw_body': msg['Body']
+                }
+                all_messages.append(formatted_msg)
+            
+            attempts += 1
         
-        return formatted_messages
+        return all_messages
         
     except Exception as e:
         logger.error(f"Error obteniendo mensajes SQS: {e}")

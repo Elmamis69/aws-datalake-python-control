@@ -117,7 +117,8 @@ python main.py dashboard
   - Mensajes retrasados
 - 💡 **Explicaciones inteligentes:**
   - Diferencia entre "disponibles" y "en procesamiento"
-  - Información sobre visibility timeout
+  - Información sobre visibility timeout (30 segundos)
+  - Botón "🔄 Refrescar SQS" para obtener mensajes frescos
 - 🤖 **Estado del worker:**
   - Detecta si está corriendo
   - Muestra comando para iniciarlo si está detenido
@@ -125,7 +126,8 @@ python main.py dashboard
   - Expandibles con ID, fecha de envío, contenido
   - Soporte para mensajes JSON de S3
   - Información de archivos procesados
-  - Opción de ver JSON completo
+  - Opción "Ver JSON completo" (funciona con texto y JSON)
+  - Manejo robusto de errores de parsing
 
 ### 🎮 **Cómo usar el Dashboard:**
 
@@ -300,18 +302,18 @@ FROM year_2026
 GROUP BY action;
 ```
 
-### Consultar mensajes SQS desde terminal (¡NUEVO!)
+### Consultar mensajes SQS desde terminal (¡MEJORADO!)
 ```bash
 # Ver estado básico de la cola
 python main.py sqs-messages
 
-# Ver hasta 20 mensajes
-python main.py sqs-messages --max-messages 20
+# Ver hasta 50 mensajes (múltiples consultas automáticas)
+python main.py sqs-messages --max-messages 50
 
 # Ver mensajes con detalles completos
 python main.py sqs-messages --details
 ```
-Monitorea el estado de la cola SQS y ve mensajes detallados desde la terminal.
+Monitorea el estado de la cola SQS y ve mensajes detallados desde la terminal. **Ahora hace múltiples consultas automáticamente para obtener más mensajes.**
 
 ### Leer archivos desde terminal (¡NUEVO!)
 ```bash
@@ -422,29 +424,214 @@ python main.py read
 
 ---
 
-## 4. 🏃 Inicio Rápido - Flujo completo
+## 🚀 **FLUJO COMPLETO DEL DATA LAKE**
 
-### Paso 1: Verificar sistema
+### **📋 PASO 1: Configuración inicial (una sola vez)**
 ```bash
-python test_app.py
-```
+# 1. Configurar AWS CLI
+aws configure
 
-### Paso 2: Ejecutar worker (Terminal 1)
-```bash
-python main.py worker
-```
+# 2. Gestión de crawlers (si existen crawlers no deseados)
+aws glue get-crawlers --query "Crawlers[*].[Name,State,Targets.S3Targets[0].Path]" --output table
+aws glue delete-crawler --name "NOMBRE_CRAWLER_NO_DESEADO"  # Si es necesario
 
-### Paso 3: Dashboard (Terminal 2)
-```bash
+# 3. Crear catálogo Glue
+python main.py glue
+
+# 4. Verificar configuración
 python main.py dashboard
 ```
 
-### Paso 4: Probar pipeline (Terminal 3)
+---
+
+### **📁 PASO 2: Subir datos RAW**
 ```bash
+# Opción A: Subir archivos manualmente a S3
+# Bucket: aws-datalake-demo-raw-992382594961
+# Carpeta: raw/events/incoming/
+
+# Opción B: Usar script de prueba
 python main.py pipeline
 ```
 
-¡Verás los archivos procesándose en tiempo real! 🚀
+---
+
+### **📬 PASO 3: Monitorear cola SQS**
+```bash
+# Ver mensajes en terminal
+python main.py sqs-messages
+
+# Ver mensajes con detalles
+python main.py sqs-messages --details --max-messages 20
+
+# Ver en dashboard web (con botón Refrescar SQS)
+python main.py dashboard
+```
+
+---
+
+### **🤖 PASO 4: Procesar datos (Worker)**
+```bash
+# Opción A: Procesamiento manual (una vez)
+python main.py worker
+
+# Opción B: Worker continuo (producción)
+# Dejar corriendo en terminal separada
+python main.py worker  # Se queda corriendo 24/7
+```
+
+---
+
+### **📊 PASO 5: Explorar datos procesados**
+```bash
+# Ver archivos en S3
+python main.py s3-sync --bucket aws-datalake-demo-raw-992382594961 --prefix processed/
+
+# Ver archivos de hoy
+python main.py s3-sync --bucket aws-datalake-demo-raw-992382594961 --date 2026-01-12
+
+# Lector interactivo de archivos
+python main.py read
+```
+
+---
+
+### **🔍 PASO 6: Consultas SQL (Athena)**
+```bash
+# Actualizar catálogo Glue
+python main.py glue
+
+# Consultas interactivas
+python main.py athena-sql
+
+# Consulta de ejemplo
+python main.py athena
+```
+
+---
+
+### **📈 PASO 7: Dashboard y monitoreo**
+```bash
+# Dashboard web completo
+python main.py dashboard
+
+# Monitoreo en terminal
+python main.py sqs-messages
+```
+
+---
+
+## 🔄 **FLUJO TÍPICO DÍA A DÍA:**
+
+### **🌅 Mañana (Setup):**
+```bash
+# 1. Iniciar worker (en terminal separada)
+python main.py worker
+
+# 2. Abrir dashboard para monitoreo
+python main.py dashboard
+```
+
+### **📤 Durante el día (Subir datos):**
+- Subir archivos a `s3://aws-datalake-demo-raw-992382594961/raw/events/incoming/`
+- El worker procesa automáticamente
+- Monitorear en dashboard
+- Usar botón "🔄 Refrescar SQS" si los mensajes están en visibility timeout
+
+### **📊 Análisis (cuando necesites):**
+```bash
+# Ver datos procesados
+python main.py read
+
+# Consultas SQL
+python main.py athena-sql
+
+# Ver estado general
+python main.py dashboard
+```
+
+---
+
+## 🛠️ **COMANDOS OPCIONALES:**
+
+### **🔧 Mantenimiento:**
+```bash
+# Consultar mensajes SQS
+python main.py sqs-messages --max-messages 50
+
+# Ver archivos específicos
+python main.py s3-sync --bucket BUCKET --latest 10
+
+# Actualizar catálogo después de cambios
+python main.py glue
+
+# Gestión de crawlers
+aws glue get-crawlers
+aws glue delete-crawler --name "NOMBRE_CRAWLER"
+```
+
+### **🧪 Testing:**
+```bash
+# Pipeline de prueba completo
+python main.py pipeline
+
+# Ver logs
+tail -f logs/main.log
+tail -f logs/worker.log
+```
+
+---
+
+## 🎯 **FLUJO RECOMENDADO PARA EMPEZAR:**
+
+```bash
+# Terminal 1: Worker (dejar corriendo)
+python main.py worker
+
+# Terminal 2: Dashboard (dejar abierto en navegador)
+python main.py dashboard
+
+# Terminal 3: Para comandos puntuales
+python main.py sqs-messages
+python main.py read
+python main.py athena-sql
+```
+
+---
+
+## ⚠️ **PROBLEMAS COMUNES Y SOLUCIONES:**
+
+### **🕷️ Gestión de Crawlers:**
+```bash
+# Ver todos los crawlers existentes
+aws glue get-crawlers --query "Crawlers[*].[Name,State,Targets.S3Targets[0].Path]" --output table
+
+# Ver detalles de un crawler específico
+aws glue get-crawler --name "NOMBRE_CRAWLER"
+
+# Eliminar crawlers no deseados
+aws glue delete-crawler --name "NOMBRE_CRAWLER"
+
+# Detener schedule de un crawler
+aws glue stop-crawler-schedule --crawler-name "NOMBRE_CRAWLER"
+```
+
+### **📬 Mensajes SQS "en procesamiento":**
+- **Causa**: Visibility timeout (30 segundos)
+- **Solución**: Usar botón "🔄 Refrescar SQS" en dashboard
+- **Normal**: Terminal y dashboard usan sesiones diferentes
+
+### **🤖 Worker no procesa:**
+```bash
+# Verificar estado
+python main.py sqs-messages
+
+# Ver logs
+tail -f logs/worker.log
+
+# Reiniciar worker
+python main.py worker
+```
 
 ---
 
@@ -598,6 +785,10 @@ sqs.purge_queue(QueueUrl='tu-queue-url')
 - 📄 **Logs**: Monitorea `logs/worker.log` para errores detallados
 - 🧹 **Limpiar cola**: Usa la consola AWS o boto3 para purgar mensajes
 - 📊 **Métricas**: El dashboard guarda cache por 30s para mejor rendimiento
+- 📬 **Mensajes "en procesamiento"**: Usa botón "🔄 Refrescar SQS" en dashboard
+- 🕷️ **Gestión de crawlers**: Usa `aws glue get-crawlers` para ver y `aws glue delete-crawler` para eliminar
+- 🔍 **SQS visibility timeout**: Normal que terminal y dashboard vean diferentes mensajes
+- 📝 **JSON parsing errors**: Ahora se manejan automáticamente en dashboard
 
 ---
 
