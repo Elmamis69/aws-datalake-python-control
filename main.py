@@ -1,6 +1,20 @@
 """
 AWS Data Lake Control - Aplicación Principal
-Orquesta el procesamiento de datos, catálogo y monitoreo
+
+Esta aplicación orquesta todo el ecosistema del Data Lake:
+- Procesamiento automático de archivos via SQS Worker
+- Gestión del catálogo de datos con AWS Glue
+- Consultas interactivas con Athena
+- Dashboard de monitoreo con Streamlit
+- Operaciones de archivos S3 (sync, delete)
+- Pipeline de pruebas end-to-end
+
+Uso: python main.py [comando] [opciones]
+Ejemplos:
+  python main.py worker          # Iniciar worker SQS
+  python main.py pipeline        # Ejecutar pipeline de prueba
+  python main.py dashboard       # Abrir dashboard web
+  python main.py s3-sync --bucket mi-bucket --latest 10
 """
 
 import logging
@@ -40,11 +54,20 @@ def load_config():
         return yaml.safe_load(f)
 
 def run_worker():
-    """Ejecutar el worker SQS para procesamiento automático"""
+    """
+    Ejecutar el worker SQS para procesamiento automático de archivos
+    
+    El worker:
+    1. Escucha mensajes de la cola SQS
+    2. Procesa archivos cuando llegan notificaciones
+    3. Transforma datos de RAW a formato Parquet
+    4. Actualiza el catálogo de Glue automáticamente
+    """
     logger.info(" Iniciando SQS Worker...")
     config = load_config()
     
     def handle_message(message):
+        """Procesar cada mensaje SQS que contiene la ubicación del archivo"""
         logger.info(f" Procesando mensaje: {message['Body']}")
         return True
     
@@ -108,7 +131,17 @@ def run_dashboard():
         sys.exit(1)
 
 def run_test_pipeline():
-    """Ejecutar pipeline de prueba"""
+    """
+    Ejecutar pipeline de prueba end-to-end
+    
+    Este pipeline:
+    1. Crea un archivo JSONL temporal con datos de prueba
+    2. Lo sube al bucket S3 RAW
+    3. Envía mensaje a SQS para procesamiento
+    4. Elimina el archivo temporal local
+    
+    Es útil para verificar que todo el flujo funciona correctamente.
+    """
     logger.info(" Ejecutando pipeline de prueba...")
     
     # Ejecutar test_pipeline.py con el PYTHONPATH correcto
@@ -128,11 +161,25 @@ def run_test_pipeline():
         sys.exit(1)
 
 def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: str = None, latest: int = None):
-    """Sincronizar archivos con S3"""
+    """
+    Listar y sincronizar archivos con S3
+    
+    Permite explorar el contenido de buckets S3 con filtros:
+    - Por fecha específica (YYYY-MM-DD)
+    - Los N archivos más recientes
+    - Límite de archivos a mostrar
+    
+    Args:
+        bucket: Nombre del bucket S3
+        prefix: Prefijo/carpeta dentro del bucket
+        limit: Máximo número de archivos a mostrar
+        date_filter: Filtrar por fecha (formato YYYY-MM-DD)
+        latest: Mostrar solo los N archivos más recientes
+    """
     logger.info(f" Sincronizando con S3: {bucket}/{prefix}")
     s3 = boto3.client('s3')
     
-    # Listar archivos
+    # Listar archivos del bucket
     response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
     objects = response.get('Contents', [])
     
@@ -172,7 +219,23 @@ def run_s3_sync(bucket: str, prefix: str = "", limit: int = None, date_filter: s
             logger.info(f"  ... y {len(objects) - limit} archivos más")
 
 def run_s3_delete(bucket: str, key: str = None, prefix: str = None, confirm: bool = False, interactive: bool = False):
-    """Eliminar archivos de S3"""
+    """
+    Eliminar archivos de S3 de forma segura
+    
+    Modos de eliminación:
+    - Archivo específico: --key archivo.json
+    - Por prefijo: --prefix carpeta/ (elimina todos los archivos)
+    - Interactivo: --interactive (permite elegir archivo específico)
+    
+    Siempre requiere confirmación para evitar eliminaciones accidentales.
+    
+    Args:
+        bucket: Nombre del bucket S3
+        key: Archivo específico a eliminar
+        prefix: Prefijo para eliminar múltiples archivos
+        confirm: Confirmar eliminación sin preguntar
+        interactive: Modo interactivo para elegir archivo
+    """
     logger.info(f"🗑️ Eliminando archivos de S3: {bucket}")
     s3 = boto3.client('s3')
     
