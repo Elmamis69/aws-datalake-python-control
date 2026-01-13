@@ -195,10 +195,10 @@ def _render_file_reader(reader_files):
         selected_file = file_options[selected_file_display]
         st.info(f"📁 **Archivo:** {selected_file['nombre']} | **Tipo:** {selected_file['tipo'].upper()} | **Tamaño:** {selected_file['tamaño']} | **Fecha:** {selected_file['fecha']}")
         
-        if download_button:
+        if 'download_button' in locals() and download_button:
             _handle_file_download(selected_file)
         
-        if read_button and is_readable:
+        if 'read_button' in locals() and read_button and is_readable:
             _handle_file_read(selected_file)
 
 
