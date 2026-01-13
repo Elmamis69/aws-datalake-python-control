@@ -315,11 +315,37 @@ python main.py sqs-messages --details
 ```
 Monitorea el estado de la cola SQS y ve mensajes detallados desde la terminal. **Ahora hace múltiples consultas automáticamente para obtener más mensajes.**
 
-### Leer archivos desde terminal (¡NUEVO!)
+### Leer archivos desde terminal (¡MEJORADO!)
 ```bash
 python main.py read
 ```
-Lector interactivo de archivos con análisis completo de datos.
+Lector interactivo de archivos con análisis completo de datos y **nueva opción de filtrado por origen**.
+
+#### **🎯 Nuevas opciones de origen:**
+- **1. Todos los archivos** - Muestra archivos de ambos buckets (Raw + Procesados)
+- **2. Solo Raw** - Muestra únicamente archivos del bucket raw
+- **3. Solo Procesados** - Muestra únicamente archivos del bucket procesados
+
+#### **🚀 Cómo usar:**
+```
+🚀 LECTOR DE ARCHIVOS INTERACTIVO
+================================================
+
+📁 ORIGEN PARA LECTOR:
+1. Todos los archivos
+2. Solo Raw
+3. Solo Procesados
+
+✨ Selecciona origen (1-3) o ENTER para todos: 2
+📂 Mostrando: Solo archivos Raw
+
+📁 Cargando lista de archivos...
+📁 ARCHIVOS DISPONIBLES (21):
+#    Archivo                             Tipo       Tamaño     Origen          Ruta
+1    test_20260112_193832.jsonl          JSONL      171B       Raw             raw/events/incoming/test_20260112_193832.jsonl
+2    test_20260112_193424.jsonl          JSONL      171B       Raw             raw/events/incoming/test_20260112_193424.jsonl
+...
+```
 
 ### Sincronizar con S3
 ```bash
@@ -342,6 +368,41 @@ python main.py s3-sync --bucket tu-bucket --latest 3
 python main.py s3-sync --bucket tu-bucket --latest 5 --date 2026-01-08
 ```
 Explora archivos en S3 con filtros avanzados por fecha y cantidad.
+
+### 🗑️ Eliminar archivos de S3 (¡NUEVO!)
+```bash
+# Listar archivos para eliminar (sin eliminar)
+python main.py s3-delete --bucket tu-bucket --prefix "carpeta/"
+
+# Modo interactivo: elegir archivo específico
+python main.py s3-delete --bucket tu-bucket --prefix "raw/events/" --interactive
+
+# Eliminar archivo específico
+python main.py s3-delete --bucket tu-bucket --key "archivo.json" --confirm
+
+# Eliminar todos los archivos con prefijo
+python main.py s3-delete --bucket tu-bucket --prefix "carpeta/" --confirm
+```
+
+#### **🎯 Características del s3-delete:**
+- **Modo seguro por defecto** - Solo lista archivos sin eliminar
+- **Modo interactivo** - Selecciona archivo específico de lista numerada
+- **Archivos ordenados** - Por fecha (más recientes primero) para coincidir con dashboard
+- **Confirmación doble** - Requiere `--confirm` o confirmación manual en modo interactivo
+- **Funciona con cualquier bucket** - Raw, procesados, o cualquier otro
+- **Eliminación por lotes** - Hasta 1000 archivos simultáneamente
+
+#### **💡 Ejemplos de uso:**
+```bash
+# Ver archivos raw para eliminar
+python main.py s3-delete --bucket aws-datalake-demo-raw-992382594961 --prefix "raw/events/incoming/"
+
+# Elegir archivo específico interactivamente
+python main.py s3-delete --bucket aws-datalake-demo-raw-992382594961 --prefix "raw/events/incoming/" --interactive
+
+# Eliminar archivos procesados de una fecha
+python main.py s3-delete --bucket aws-datalake-demo-processed-992382594961 --prefix "processed/events/" --confirm
+```
 
 ---
 
@@ -554,13 +615,16 @@ python main.py dashboard
 
 ## 🛠️ **COMANDOS OPCIONALES:**
 
-### **🔧 Mantenimiento:**
+### **🗑️ Mantenimiento y limpieza:**
 ```bash
 # Consultar mensajes SQS
 python main.py sqs-messages --max-messages 50
 
 # Ver archivos específicos
 python main.py s3-sync --bucket BUCKET --latest 10
+
+# Eliminar archivos interactivamente
+python main.py s3-delete --bucket BUCKET --prefix "carpeta/" --interactive
 
 # Actualizar catálogo después de cambios
 python main.py glue
@@ -758,8 +822,11 @@ python main.py athena-sql
 # Consultar mensajes SQS desde terminal
 python main.py sqs-messages
 
-# Ver archivos S3 (básico)
+# Eliminar archivos S3 (básico)
 python main.py s3-sync --bucket tu-bucket
+
+# Eliminar archivos S3 - Modo interactivo (¡NUEVO!)
+python main.py s3-delete --bucket tu-bucket --prefix "carpeta/" --interactive
 
 # Ver archivos S3 (avanzado)
 python main.py s3-sync --bucket tu-bucket --latest 5 --date 2026-01-08
