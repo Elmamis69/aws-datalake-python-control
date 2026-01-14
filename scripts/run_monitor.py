@@ -9,7 +9,11 @@ import yaml
 import boto3
 import argparse
 from datetime import datetime, timedelta
-from datalake.aws_session import get_boto3_session
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.datalake.aws_session import get_boto3_session
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '../config/settings.yaml')
 

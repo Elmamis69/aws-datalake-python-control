@@ -17,6 +17,7 @@ from src.dashboard.metrics import get_metrics
 from src.dashboard.ui_components import render_metrics_cards, render_system_status, render_advanced_charts
 from src.dashboard.tabs import render_files_tab, render_sqs_tab
 from src.dashboard.utils import format_size, check_worker_status
+from src.dashboard.cloudwatch_dashboard import render_cloudwatch_metrics
 from scripts.run_monitor import load_config
 
 # Configurar página
@@ -56,13 +57,16 @@ def main():
     render_advanced_charts(metrics)
     
     # Crear pestañas principales
-    tab1, tab2 = st.tabs(["📄 Lista de Archivos", "📬 Mensajes SQS"])
+    tab1, tab2, tab3 = st.tabs(["📄 Lista de Archivos", "📬 Mensajes SQS", "📊 CloudWatch"])
     
     with tab1:
         render_files_tab(metrics)
     
     with tab2:
         render_sqs_tab(metrics)
+    
+    with tab3:
+        render_cloudwatch_metrics()
     
     # Errores recientes
     if metrics['errors']:

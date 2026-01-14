@@ -23,4 +23,9 @@ processing:
 glue:
   crawler_name: datalake-processed-crawler  # Cambia por el nombre real de tu crawler en AWS Glue
 
+cloudwatch:
+  namespace: DataLake/Pipeline    # Namespace para métricas personalizadas
+  sns_topic: arn:aws:sns:us-east-1:123456789012:datalake-alerts  # Topic SNS para alertas (opcional)
+  retention_days: 30              # Días de retención de métricas
+
 # Agrega aquí más parámetros según crezca el proyecto
